@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>바코드 생성기</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>바코드 생성기</h1>
+        
+        <div class="barcode-section">
+            <div class="barcode-display">
+                <div class="barcode-container">
+                    <img id="barcode" alt="바코드" />
+                </div>
+                <div id="barcode-caption" class="barcode-caption"></div>
+            </div>
+            <div class="barcode-navigation">
+                <button id="prev-barcode" class="nav-btn" title="이전 바코드">▲</button>
+                <span id="barcode-index" class="barcode-index">1/1</span>
+                <button id="next-barcode" class="nav-btn" title="다음 바코드">▼</button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="button-group">
+                <button id="save-btn" class="btn btn-secondary">저장</button>
+                <button id="print-btn" class="btn btn-secondary">인쇄</button>
+                <button id="copy-btn" class="btn btn-secondary" title="바코드 이미지를 클립보드에 복사">이미지 복사</button>
+            </div>
+
+            <div class="input-group">
+                <label for="barcode-value">바코드 값 (여러 개 입력 시 줄바꿈으로 구분)</label>
+                <div class="input-with-button">
+                    <textarea id="barcode-value" placeholder="바코드 값을 입력하세요&#10;줄바꿈으로 구분" rows="10">1234567890</textarea>
+                    <button id="auto-btn" class="auto-btn" title="활성화하면 입력 필드 클릭 시 자동 초기화">auto clear</button>
+                    <div id="barcode-indicators" class="barcode-indicators"></div>
+                </div>
+            </div>            
+            
+            <div class="input-group">
+                <label for="barcode-format">바코드 형식</label>
+                <select id="barcode-format">
+                    <option value="CODE128" selected>CODE128 Auto</option>
+                    <option value="CODE128A">CODE128 A</option>
+                    <option value="CODE128B">CODE128 B</option>
+                    <option value="CODE128C">CODE128 C</option>
+                </select>
+            </div>
+            
+            <div class="settings">
+                <div class="setting-group">
+                    <label for="bar-width">Bar Width: <span id="bar-width-value">2</span></label>
+                    <input type="range" id="bar-width" min="1" max="5" value="2" step="0.5">
+                </div>
+                
+                <div class="setting-group">
+                    <label for="height">Height: <span id="height-value">100</span></label>
+                    <input type="range" id="height" min="50" max="200" value="100">
+                </div>
+                
+                <div class="setting-group">
+                    <label for="margin">Margin: <span id="margin-value">10</span></label>
+                    <input type="range" id="margin" min="0" max="50" value="10">
+                </div>
+                
+                <div class="setting-group">
+                    <label for="font-size">Font Size: <span id="font-size-value">20</span></label>
+                    <input type="range" id="font-size" min="10" max="40" value="20">
+                </div>
+                
+                <div class="setting-group">
+                    <label for="text-margin">Text Margin: <span id="text-margin-value">2</span></label>
+                    <input type="range" id="text-margin" min="0" max="20" value="2">
+                </div>
+                
+                <div class="color-settings">
+                    <div class="input-group">
+                        <label for="background-color">Background Color</label>
+                        <input type="text" id="background-color" value="#FFFFFF" placeholder="#FFFFFF">
+                        <input type="color" id="background-color-picker" value="#FFFFFF">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="line-color">Line Color</label>
+                        <input type="text" id="line-color" value="#000000" placeholder="#000000">
+                        <input type="color" id="line-color-picker" value="#000000">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="toast" class="toast"></div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
