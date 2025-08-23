@@ -251,16 +251,26 @@ h1 {
     font-family: 'Roboto', 'Noto Sans KR', sans-serif;
 }
 
+.input-group-sub {
+    display: flex;
+    justify-content: space-between;
+}
+
+.input-group-sub .flex-end .auto-btn {
+    margin-left: 20px;
+}
+
 .auto-btn {
-    position: absolute;
-    right: 5px;
-    top: 20px;
+    /* position: absolute; */
+    /* right: 5px;
+    top: 20px; */
     transform: translateY(-50%);
     background: #f0f0f0;
     border: 1px solid #d0d0d0;
     border-radius: 4px;
+    margin-top: 12px;
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: 15px;
     color: #666;
     cursor: pointer;
     transition: all 0.2s;

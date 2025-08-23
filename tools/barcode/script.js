@@ -7,6 +7,7 @@ const barcodeValue = document.getElementById('barcode-value');
 const barcodeFormat = document.getElementById('barcode-format');
 const barcodeCaption = document.getElementById('barcode-caption');
 const autoBtn = document.getElementById('auto-btn');
+const autoCleanBtn = document.getElementById('auto-clean-btn');
 const barcodeIndexDisplay = document.getElementById('barcode-index');
 const prevBarcodeBtn = document.getElementById('prev-barcode');
 const nextBarcodeBtn = document.getElementById('next-barcode');
@@ -292,6 +293,30 @@ autoBtn.addEventListener('click', function() {
     this.classList.toggle('active', isAutoMode);
     localStorage.setItem('barcodeAutoMode', isAutoMode);
     // showToast(isAutoMode ? 'Auto 모드 활성화' : 'Auto 모드 비활성화');
+});
+
+autoCleanBtn.addEventListener('click', function() {
+    const inputText = barcodeValue.value.trim();
+    if (!inputText) {
+        showToast('정규화할 데이터가 없습니다.');
+        return;
+    }
+    
+    // GC-로 시작하고 -1 또는 -2로 끝나는 패턴 찾기
+    const regex = /GC-[\w\-]+(?:-[12])/g;
+    const matches = inputText.match(regex);
+    
+    if (matches && matches.length > 0) {
+        // 중복 제거
+        const uniqueMatches = [...new Set(matches)];
+        barcodeValue.value = uniqueMatches.join('\n');
+        adjustTextareaHeight();
+        currentBarcodeIndex = 0;
+        generateBarcode();
+        showToast(`${uniqueMatches.length}개의 바코드가 추출되었습니다.`);
+    } else {
+        showToast('GC-로 시작하고 -1 또는 -2로 끝나는 데이터를 찾을 수 없습니다.');
+    }
 });
 
 barcodeValue.addEventListener('click', function() {

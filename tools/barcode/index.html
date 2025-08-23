@@ -11,7 +11,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>바코드 생성기</h1>
+        <!-- <h1>바코드 생성기</h1> -->
         
         <div class="barcode-section">
             <div class="barcode-display">
@@ -35,10 +35,16 @@
             </div>
 
             <div class="input-group">
-                <label for="barcode-value">바코드 값 (여러 개 입력 시 줄바꿈으로 구분)</label>
+                <div class="input-group-sub">
+                    <label for="barcode-value">바코드 값 (여러 개 입력 시 줄바꿈으로 구분)</label>
+                    <div class="flex-end">
+                        <button id="auto-clean-btn" class="auto-btn" title="클릭시 데이터 정제">정규화</button>
+                        <button id="auto-btn" class="auto-btn" title="활성화하면 입력 필드 클릭 시 자동 초기화">자동비움</button>
+                    </div>
+                </div>
                 <div class="input-with-button">
                     <textarea id="barcode-value" placeholder="바코드 값을 입력하세요&#10;줄바꿈으로 구분" rows="10"></textarea>
-                    <button id="auto-btn" class="auto-btn" title="활성화하면 입력 필드 클릭 시 자동 초기화">auto clear</button>
+                    
                     <div id="barcode-indicators" class="barcode-indicators"></div>
                 </div>
             </div>            
