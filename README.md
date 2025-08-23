@@ -1,4 +1,4 @@
-# [바코드 생성기](https://ziz-ls.github.io/tools/barcode)
+# [바코드 생성기](https://ziz-cl.github.io/tools/barcode)
 
 CODE128 형식의 바코드를 생성하는 웹 애플리케이션입니다.
 
@@ -18,7 +18,7 @@ CODE128 형식의 바코드를 생성하는 웹 애플리케이션입니다.
   - Background color 변경
   - Line color 변경
 
-## [>> 바코드 생성기 <<](https://ziz-ls.github.io/tools/barcode)
+## [>> 바코드 생성기 <<](https://ziz-cl.github.io/tools/barcode)
 
 ## 기술 스택
 
