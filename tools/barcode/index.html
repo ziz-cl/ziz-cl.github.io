@@ -19,6 +19,7 @@
                     <img id="barcode" alt="바코드" />
                 </div>
                 <div id="barcode-caption" class="barcode-caption"></div>
+                <div id="barcode-memo" class="barcode-memo"></div>
             </div>
             <div class="barcode-navigation">
                 <button id="prev-barcode" class="nav-btn" title="이전 바코드">▲</button>
@@ -28,6 +29,17 @@
         </div>
         
         <div class="controls">
+            <!-- 메모 버튼 그룹 -->
+            <div class="memo-group">
+                <label>바코드 메모</label>
+                <div class="memo-buttons">
+                    <button id="memo-waiting" class="memo-btn">상차대기</button>
+                    <button id="memo-shortage" class="memo-btn">수량부족</button>
+                    <button id="memo-packing" class="memo-btn">상차패킹</button>
+                    <input type="text" id="memo-custom" placeholder="커스텀 메모 입력..." class="memo-input">
+                </div>
+            </div>
+            
             <div class="button-group">
                 <button id="save-btn" class="btn btn-secondary">저장</button>
                 <button id="print-btn" class="btn btn-secondary">인쇄</button>
@@ -47,55 +59,65 @@
                     
                     <div id="barcode-indicators" class="barcode-indicators"></div>
                 </div>
-            </div>            
+            </div>    
             
-            <div class="input-group">
-                <label for="barcode-format">바코드 형식</label>
-                <select id="barcode-format">
-                    <option value="CODE128" selected>CODE128 Auto</option>
-                    <option value="CODE128A">CODE128 A</option>
-                    <option value="CODE128B">CODE128 B</option>
-                    <option value="CODE128C">CODE128 C</option>
-                </select>
-            </div>
             
-            <div class="settings">
-                <div class="setting-group">
-                    <label for="bar-width">Bar Width: <span id="bar-width-value">2</span></label>
-                    <input type="range" id="bar-width" min="1" max="5" value="2" step="0.5">
+            <!-- 고급 기능 토글 버튼 -->
+            <button id="advanced-toggle" class="advanced-toggle-btn">
+                ⚙️ 고급 설정
+                <span class="toggle-icon">▼</span>
+            </button>
+            
+            <!-- 고급 기능 섹션 (기본적으로 숨김) -->
+            <div id="advanced-settings" class="advanced-settings">
+                <div class="input-group">
+                    <label for="barcode-format">바코드 형식</label>
+                    <select id="barcode-format">
+                        <option value="CODE128" selected>CODE128 Auto</option>
+                        <option value="CODE128A">CODE128 A</option>
+                        <option value="CODE128B">CODE128 B</option>
+                        <option value="CODE128C">CODE128 C</option>
+                    </select>
                 </div>
                 
-                <div class="setting-group">
-                    <label for="height">Height: <span id="height-value">100</span></label>
-                    <input type="range" id="height" min="50" max="200" value="100">
-                </div>
-                
-                <div class="setting-group">
-                    <label for="margin">Margin: <span id="margin-value">10</span></label>
-                    <input type="range" id="margin" min="0" max="50" value="10">
-                </div>
-                
-                <div class="setting-group">
-                    <label for="font-size">Font Size: <span id="font-size-value">20</span></label>
-                    <input type="range" id="font-size" min="10" max="40" value="20">
-                </div>
-                
-                <div class="setting-group">
-                    <label for="text-margin">Text Margin: <span id="text-margin-value">2</span></label>
-                    <input type="range" id="text-margin" min="0" max="20" value="2">
-                </div>
-                
-                <div class="color-settings">
-                    <div class="input-group">
-                        <label for="background-color">Background Color</label>
-                        <input type="text" id="background-color" value="#FFFFFF" placeholder="#FFFFFF">
-                        <input type="color" id="background-color-picker" value="#FFFFFF">
+                <div class="settings">
+                    <div class="setting-group">
+                        <label for="bar-width">Bar Width: <span id="bar-width-value">2</span></label>
+                        <input type="range" id="bar-width" min="1" max="5" value="2" step="0.5">
                     </div>
                     
-                    <div class="input-group">
-                        <label for="line-color">Line Color</label>
-                        <input type="text" id="line-color" value="#000000" placeholder="#000000">
-                        <input type="color" id="line-color-picker" value="#000000">
+                    <div class="setting-group">
+                        <label for="height">Height: <span id="height-value">100</span></label>
+                        <input type="range" id="height" min="50" max="200" value="100">
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="margin">Margin: <span id="margin-value">10</span></label>
+                        <input type="range" id="margin" min="0" max="50" value="10">
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="font-size">Font Size: <span id="font-size-value">20</span></label>
+                        <input type="range" id="font-size" min="10" max="40" value="20">
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="text-margin">Text Margin: <span id="text-margin-value">2</span></label>
+                        <input type="range" id="text-margin" min="0" max="20" value="2">
+                    </div>
+                    
+                    <div class="color-settings">
+                        <div class="input-group">
+                            <label for="background-color">Background Color</label>
+                            <input type="text" id="background-color" value="#FFFFFF" placeholder="#FFFFFF">
+                            <input type="color" id="background-color-picker" value="#FFFFFF">
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="line-color">Line Color</label>
+                            <input type="text" id="line-color" value="#000000" placeholder="#000000">
+                            <input type="color" id="line-color-picker" value="#000000">
+                        </div>
                     </div>
                 </div>
             </div>

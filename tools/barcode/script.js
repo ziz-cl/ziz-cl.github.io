@@ -37,6 +37,16 @@ const copyBtn = document.getElementById('copy-btn');
 const toast = document.getElementById('toast');
 const barcodeDisplay = document.querySelector('.barcode-display');
 
+// 메모 관련 요소들
+const memoWaitingBtn = document.getElementById('memo-waiting');
+const memoShortageBtn = document.getElementById('memo-shortage');
+const memoPackingBtn = document.getElementById('memo-packing');
+const memoCustomInput = document.getElementById('memo-custom');
+const barcodeMemo = document.getElementById('barcode-memo');
+
+// 각 바코드별 메모 상태 저장
+let barcodeMemosState = {};
+
 function parseBarcodeValues() {
     const inputText = barcodeValue.value.trim();
     if (!inputText) {
@@ -90,12 +100,68 @@ function updateIndicators() {
     }
 }
 
+// 메모 상태 업데이트 함수
+function updateMemoDisplay() {
+    const currentValue = barcodeValues[currentBarcodeIndex] || '1234567890';
+    const memoState = barcodeMemosState[currentValue];
+    
+    // 바코드 값은 캡션 영역에 표시
+    barcodeCaption.textContent = currentValue;
+    
+    // 메모는 별도 영역에 표시
+    let memoText = '';
+    if (memoState) {
+        if (memoState.custom) {
+            memoText = memoState.custom;
+        } else if (memoState.packing) {
+            memoText = '패킹';
+        } else {
+            const memos = [];
+            if (memoState.waiting) memos.push('대기');
+            if (memoState.shortage) memos.push('수량부족');
+            memoText = memos.join(', ');
+        }
+    }
+    
+    barcodeMemo.textContent = memoText;
+}
+
+// 메모 상태 초기화 함수
+function resetMemoState() {
+    // UI 상태 초기화
+    memoWaitingBtn.classList.remove('active');
+    memoShortageBtn.classList.remove('active');
+    memoPackingBtn.classList.remove('active');
+    memoCustomInput.classList.remove('active');
+    memoCustomInput.value = '';
+    
+    // 현재 바코드의 메모 상태 로드
+    const currentValue = barcodeValues[currentBarcodeIndex] || '1234567890';
+    const memoState = barcodeMemosState[currentValue];
+    
+    if (memoState) {
+        if (memoState.custom) {
+            memoCustomInput.value = memoState.custom;
+            memoCustomInput.classList.add('active');
+        } else {
+            if (memoState.waiting) memoWaitingBtn.classList.add('active');
+            if (memoState.shortage) memoShortageBtn.classList.add('active');
+            if (memoState.packing) memoPackingBtn.classList.add('active');
+        }
+    }
+    
+    updateMemoDisplay();
+}
+
 function generateBarcode() {
     barcodeValues = parseBarcodeValues();
     updateBarcodeNavigation();
     
     const value = barcodeValues[currentBarcodeIndex] || '1234567890';
     const format = barcodeFormat.value;
+    
+    // 바코드 변경 시 메모 상태 초기화/복원
+    resetMemoState();
     
     const options = {
         format: format,
@@ -335,6 +401,112 @@ barcodeDisplay.addEventListener('click', function() {
     range.selectNodeContents(this);
     selection.removeAllRanges();
     selection.addRange(range);
+});
+
+// 메모 버튼 이벤트 리스너
+function saveMemoState() {
+    const currentValue = barcodeValues[currentBarcodeIndex] || '1234567890';
+    
+    if (memoCustomInput.classList.contains('active') && memoCustomInput.value.trim()) {
+        // 커스텀 입력이 활성화되어 있고 값이 있을 때
+        barcodeMemosState[currentValue] = {
+            custom: memoCustomInput.value.trim(),
+            waiting: false,
+            shortage: false,
+            packing: false
+        };
+    } else {
+        // 기본 버튼들 상태 저장
+        barcodeMemosState[currentValue] = {
+            custom: '',
+            waiting: memoWaitingBtn.classList.contains('active'),
+            shortage: memoShortageBtn.classList.contains('active'),
+            packing: memoPackingBtn.classList.contains('active')
+        };
+    }
+    
+    updateMemoDisplay();
+}
+
+// 대기 버튼
+memoWaitingBtn.addEventListener('click', function() {
+    if (memoCustomInput.classList.contains('active')) {
+        // 커스텀이 활성화되어 있으면 모든 상태 초기화
+        memoCustomInput.classList.remove('active');
+        memoCustomInput.value = '';
+        memoPackingBtn.classList.remove('active');
+    } else if (memoPackingBtn.classList.contains('active')) {
+        // 패킹이 활성화되어 있으면 패킹 해제
+        memoPackingBtn.classList.remove('active');
+    }
+    
+    this.classList.toggle('active');
+    saveMemoState();
+});
+
+// 부족 버튼
+memoShortageBtn.addEventListener('click', function() {
+    if (memoCustomInput.classList.contains('active')) {
+        // 커스텀이 활성화되어 있으면 모든 상태 초기화
+        memoCustomInput.classList.remove('active');
+        memoCustomInput.value = '';
+        memoPackingBtn.classList.remove('active');
+    } else if (memoPackingBtn.classList.contains('active')) {
+        // 패킹이 활성화되어 있으면 패킹 해제
+        memoPackingBtn.classList.remove('active');
+    }
+    
+    this.classList.toggle('active');
+    saveMemoState();
+});
+
+// 패킹 버튼 (단독 선택)
+memoPackingBtn.addEventListener('click', function() {
+    // 다른 모든 상태 해제
+    memoWaitingBtn.classList.remove('active');
+    memoShortageBtn.classList.remove('active');
+    memoCustomInput.classList.remove('active');
+    memoCustomInput.value = '';
+    
+    this.classList.toggle('active');
+    saveMemoState();
+});
+
+// 커스텀 입력 (단독 사용)
+memoCustomInput.addEventListener('input', function() {
+    if (this.value.trim()) {
+        // 입력이 있으면 다른 모든 버튼 해제
+        memoWaitingBtn.classList.remove('active');
+        memoShortageBtn.classList.remove('active');
+        memoPackingBtn.classList.remove('active');
+        this.classList.add('active');
+    } else {
+        this.classList.remove('active');
+    }
+    
+    saveMemoState();
+});
+
+memoCustomInput.addEventListener('focus', function() {
+    if (this.value.trim()) {
+        this.classList.add('active');
+    }
+});
+
+// 고급 설정 토글 기능
+const advancedToggleBtn = document.getElementById('advanced-toggle');
+const advancedSettings = document.getElementById('advanced-settings');
+
+advancedToggleBtn.addEventListener('click', function() {
+    const isShowing = advancedSettings.classList.contains('show');
+    
+    if (isShowing) {
+        advancedSettings.classList.remove('show');
+        this.classList.remove('active');
+    } else {
+        advancedSettings.classList.add('show');
+        this.classList.add('active');
+    }
 });
 
 document.addEventListener('DOMContentLoaded', () => {

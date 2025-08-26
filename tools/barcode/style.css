@@ -201,6 +201,25 @@ h1 {
     transition: background-color 0.2s;
 }
 
+.barcode-memo {
+    margin-top: 5px;
+    font-size: 25px;
+    color: #667eea;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #f8f9ff;
+    border: 1px solid #e0e7ff;
+    min-height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.barcode-memo:empty {
+    display: none;
+}
+
 .controls {
     display: flex;
     flex-direction: column;
@@ -460,6 +479,124 @@ h1 {
         flex-direction: row;
         margin-top: 20px;
     }
+}
+
+/* 메모 버튼 그룹 스타일 */
+.memo-group {
+    margin-bottom: 20px;
+}
+
+.memo-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.memo-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.memo-btn {
+    padding: 8px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: 'Roboto', 'Noto Sans KR', sans-serif;
+}
+
+.memo-btn:hover {
+    border-color: #667eea;
+    background: #f8f9fa;
+}
+
+.memo-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+.memo-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+    font-family: 'Roboto', 'Noto Sans KR', sans-serif;
+}
+
+.memo-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.memo-input.active {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+/* 고급 설정 토글 버튼 스타일 */
+.advanced-toggle-btn {
+    width: 100%;
+    padding: 12px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f8f9fa;
+    color: #333;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: 'Roboto', 'Noto Sans KR', sans-serif;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.advanced-toggle-btn:hover {
+    background: #e9ecef;
+    border-color: #667eea;
+}
+
+.advanced-toggle-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+.toggle-icon {
+    font-size: 14px;
+    transition: transform 0.3s;
+}
+
+.advanced-toggle-btn.active .toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* 고급 설정 섹션 스타일 */
+.advanced-settings {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+}
+
+.advanced-settings.show {
+    max-height: 2000px;
+    opacity: 1;
+    transition: max-height 0.5s ease-in, opacity 0.3s ease-in;
 }
 
 @media print {
