@@ -27,6 +27,19 @@
                 <button id="next-barcode" class="nav-btn" title="다음 바코드">▼</button>
             </div>
         </div>
+
+        <!-- 바코드 배치 표시 섹션 -->
+        <div id="batch-display" class="batch-display" style="display: none;">
+            <div class="batch-header">
+                <h3>바코드 배치 미리보기</h3>
+                <div class="batch-controls">
+                    <button id="batch-close" class="btn btn-secondary">닫기</button>
+                    <button id="batch-print" class="btn btn-primary">인쇄</button>
+                    <button id="batch-save" class="btn btn-primary">이미지 저장</button>
+                </div>
+            </div>
+            <div id="batch-grid" class="batch-grid"></div>
+        </div>
         
         <div class="controls">
             <!-- 메모 버튼 그룹 -->
@@ -39,6 +52,7 @@
                     <input type="text" id="memo-custom" placeholder="커스텀 메모 입력..." class="memo-input">
                 </div>
             </div>
+
             
             <div class="button-group">
                 <button id="save-btn" class="btn btn-secondary">저장</button>
@@ -59,9 +73,33 @@
                     
                     <div id="barcode-indicators" class="barcode-indicators"></div>
                 </div>
-            </div>    
-            
-            
+            </div>
+
+            <!-- 범위 생성 토글 버튼 -->
+            <button id="range-toggle" class="advanced-toggle-btn">
+                📊 범위 생성
+                <span class="toggle-icon">▼</span>
+            </button>
+
+            <!-- 범위 생성 섹션 (기본적으로 숨김) -->
+            <div id="range-settings" class="advanced-settings">
+                <div class="range-group">
+                    <div class="range-controls">
+                        <div class="range-inputs">
+                            <input type="text" id="range-prefix" placeholder="접두사" value="3017-RCRT4-1-" class="range-input">
+                            <input type="number" id="range-start" placeholder="시작" value="1" min="1" class="range-input">
+                            <span>~</span>
+                            <input type="number" id="range-end" placeholder="끝" value="1000" min="1" class="range-input">
+                        </div>
+                        <div class="range-buttons">
+                            <button id="generate-range-btn" class="btn btn-primary">범위 생성</button>
+                            <button id="print-range-btn" class="btn btn-secondary">일괄 인쇄</button>
+                            <button id="save-range-btn" class="btn btn-secondary">일괄 저장</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 고급 기능 토글 버튼 -->
             <button id="advanced-toggle" class="advanced-toggle-btn">
                 ⚙️ 고급 설정

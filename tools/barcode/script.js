@@ -47,6 +47,24 @@ const barcodeMemo = document.getElementById('barcode-memo');
 // 각 바코드별 메모 상태 저장
 let barcodeMemosState = {};
 
+// 범위 생성 관련 요소들
+const rangePrefix = document.getElementById('range-prefix');
+const rangeStart = document.getElementById('range-start');
+const rangeEnd = document.getElementById('range-end');
+const generateRangeBtn = document.getElementById('generate-range-btn');
+const printRangeBtn = document.getElementById('print-range-btn');
+const saveRangeBtn = document.getElementById('save-range-btn');
+
+// 배치 표시 관련 요소들
+const batchDisplay = document.getElementById('batch-display');
+const batchGrid = document.getElementById('batch-grid');
+const batchCloseBtn = document.getElementById('batch-close');
+const batchPrintBtn = document.getElementById('batch-print');
+const batchSaveBtn = document.getElementById('batch-save');
+
+// 현재 배치 데이터 저장
+let currentBatchData = [];
+
 function parseBarcodeValues() {
     const inputText = barcodeValue.value.trim();
     if (!inputText) {
@@ -493,19 +511,271 @@ memoCustomInput.addEventListener('focus', function() {
     }
 });
 
+// 범위 생성 토글 기능
+const rangeToggleBtn = document.getElementById('range-toggle');
+const rangeSettings = document.getElementById('range-settings');
+
+rangeToggleBtn.addEventListener('click', function() {
+    const isShowing = rangeSettings.classList.contains('show');
+
+    if (isShowing) {
+        rangeSettings.classList.remove('show');
+        this.classList.remove('active');
+    } else {
+        rangeSettings.classList.add('show');
+        this.classList.add('active');
+    }
+});
+
 // 고급 설정 토글 기능
 const advancedToggleBtn = document.getElementById('advanced-toggle');
 const advancedSettings = document.getElementById('advanced-settings');
 
 advancedToggleBtn.addEventListener('click', function() {
     const isShowing = advancedSettings.classList.contains('show');
-    
+
     if (isShowing) {
         advancedSettings.classList.remove('show');
         this.classList.remove('active');
     } else {
         advancedSettings.classList.add('show');
         this.classList.add('active');
+    }
+});
+
+// 범위 생성 함수
+function generateBarcodeRange() {
+    const prefix = rangePrefix.value.trim();
+    const start = parseInt(rangeStart.value);
+    const end = parseInt(rangeEnd.value);
+
+    if (!prefix) {
+        showToast('접두사를 입력해주세요.');
+        return;
+    }
+
+    if (isNaN(start) || isNaN(end) || start < 1 || end < 1) {
+        showToast('유효한 시작과 끝 숫자를 입력해주세요.');
+        return;
+    }
+
+    if (start > end) {
+        showToast('시작 숫자가 끝 숫자보다 클 수 없습니다.');
+        return;
+    }
+
+    const range = end - start + 1;
+    if (range > 1000) {
+        showToast('한 번에 생성할 수 있는 바코드는 최대 1000개입니다.');
+        return;
+    }
+
+    const rangeValues = [];
+    for (let i = start; i <= end; i++) {
+        rangeValues.push(prefix + i);
+    }
+
+    barcodeValue.value = rangeValues.join('\n');
+    adjustTextareaHeight();
+    currentBarcodeIndex = 0;
+    generateBarcode();
+
+    showToast(`${range}개의 바코드가 생성되었습니다.`);
+}
+
+// 배치 바코드 생성 함수
+async function generateBatchBarcodes(values) {
+    const format = barcodeFormat.value;
+    const batchData = [];
+
+    const options = {
+        format: format,
+        width: parseFloat(barWidthSlider.value),
+        height: parseInt(heightSlider.value),
+        margin: parseInt(marginSlider.value),
+        fontSize: parseInt(fontSizeSlider.value),
+        textMargin: parseInt(textMarginSlider.value),
+        background: backgroundColorInput.value,
+        lineColor: lineColorInput.value,
+        displayValue: false,
+        font: 'Roboto',
+        fontOptions: 'bold',
+        textAlign: 'center',
+        textPosition: 'bottom'
+    };
+
+    for (const value of values) {
+        try {
+            const canvas = document.createElement('canvas');
+            JsBarcode(canvas, value, options);
+            const dataURL = canvas.toDataURL('image/png');
+
+            batchData.push({
+                value: value,
+                imageData: dataURL
+            });
+        } catch (error) {
+            console.error(`Error generating barcode for ${value}:`, error);
+        }
+    }
+
+    return batchData;
+}
+
+// 배치 표시 함수
+function displayBatch(batchData) {
+    batchGrid.innerHTML = '';
+
+    batchData.forEach(item => {
+        const batchItem = document.createElement('div');
+        batchItem.className = 'batch-item';
+
+        const img = document.createElement('img');
+        img.src = item.imageData;
+        img.alt = `바코드: ${item.value}`;
+
+        const text = document.createElement('div');
+        text.className = 'barcode-text';
+        text.textContent = item.value;
+
+        batchItem.appendChild(img);
+        batchItem.appendChild(text);
+        batchGrid.appendChild(batchItem);
+    });
+
+    batchDisplay.style.display = 'block';
+    currentBatchData = batchData;
+}
+
+// 배치 인쇄 함수
+function printBatch() {
+    if (currentBatchData.length === 0) {
+        showToast('인쇄할 바코드가 없습니다.');
+        return;
+    }
+
+    // 기존 바코드 섹션 숨기기
+    document.querySelector('.barcode-section').style.display = 'none';
+    document.querySelector('.controls').style.display = 'none';
+
+    // 배치 표시 보이기
+    batchDisplay.style.display = 'block';
+
+    // 인쇄 실행
+    window.print();
+
+    // 인쇄 후 원래 상태로 복원
+    setTimeout(() => {
+        document.querySelector('.barcode-section').style.display = 'flex';
+        document.querySelector('.controls').style.display = 'flex';
+    }, 1000);
+}
+
+// 배치 이미지 저장 함수
+async function saveBatchAsImages() {
+    if (currentBatchData.length === 0) {
+        showToast('저장할 바코드가 없습니다.');
+        return;
+    }
+
+    // JSZip 라이브러리가 있다면 ZIP으로 압축, 없다면 개별 다운로드
+    try {
+        for (let i = 0; i < currentBatchData.length; i++) {
+            const item = currentBatchData[i];
+            const a = document.createElement('a');
+            a.href = item.imageData;
+            a.download = `barcode_${item.value}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            // 다운로드 간격 조정 (브라우저 제한 방지)
+            if (i < currentBatchData.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        showToast(`${currentBatchData.length}개의 바코드 이미지가 저장되었습니다.`);
+    } catch (error) {
+        console.error('Batch save error:', error);
+        showToast('배치 저장 중 오류가 발생했습니다.');
+    }
+}
+
+// 범위 생성 이벤트 리스너
+generateRangeBtn.addEventListener('click', generateBarcodeRange);
+
+// 범위 일괄 인쇄 이벤트 리스너
+printRangeBtn.addEventListener('click', async () => {
+    const prefix = rangePrefix.value.trim();
+    const start = parseInt(rangeStart.value);
+    const end = parseInt(rangeEnd.value);
+
+    if (!prefix || isNaN(start) || isNaN(end) || start > end) {
+        showToast('올바른 범위를 입력해주세요.');
+        return;
+    }
+
+    const range = end - start + 1;
+    if (range > 100) {
+        showToast('일괄 인쇄는 최대 100개까지 가능합니다.');
+        return;
+    }
+
+    const values = [];
+    for (let i = start; i <= end; i++) {
+        values.push(prefix + i);
+    }
+
+    showToast('바코드 생성 중...');
+    const batchData = await generateBatchBarcodes(values);
+    displayBatch(batchData);
+
+    setTimeout(() => printBatch(), 500);
+});
+
+// 범위 일괄 저장 이벤트 리스너
+saveRangeBtn.addEventListener('click', async () => {
+    const prefix = rangePrefix.value.trim();
+    const start = parseInt(rangeStart.value);
+    const end = parseInt(rangeEnd.value);
+
+    if (!prefix || isNaN(start) || isNaN(end) || start > end) {
+        showToast('올바른 범위를 입력해주세요.');
+        return;
+    }
+
+    const range = end - start + 1;
+    if (range > 200) {
+        showToast('일괄 저장은 최대 200개까지 가능합니다.');
+        return;
+    }
+
+    const values = [];
+    for (let i = start; i <= end; i++) {
+        values.push(prefix + i);
+    }
+
+    showToast('바코드 생성 중...');
+    const batchData = await generateBatchBarcodes(values);
+    displayBatch(batchData);
+
+    setTimeout(() => saveBatchAsImages(), 500);
+});
+
+// 배치 제어 이벤트 리스너
+batchCloseBtn.addEventListener('click', () => {
+    batchDisplay.style.display = 'none';
+    currentBatchData = [];
+});
+
+batchPrintBtn.addEventListener('click', printBatch);
+batchSaveBtn.addEventListener('click', saveBatchAsImages);
+
+// 범위 입력 시 자동 끝값 계산
+rangeStart.addEventListener('input', () => {
+    const start = parseInt(rangeStart.value);
+    if (!isNaN(start) && !rangeEnd.value) {
+        rangeEnd.value = Math.min(start + 99, 1000); // 기본적으로 100개 범위
     }
 });
 
