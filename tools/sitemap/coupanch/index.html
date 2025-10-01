@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLS 쿠펀치 - 앱 다운로드</title>
+
+    <!-- 폴백 리다이렉트 (JavaScript 비활성화 시) -->
+    <meta http-equiv="refresh" content="0;url=https://play.google.com/store/apps/details?id=com.coupang.ats.coupunch">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-top: 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .message {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+
+    <script>
+        (function() {
+            // User Agent 체크
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+            // iOS 감지
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+
+            // Android 감지
+            const isAndroid = /android/i.test(userAgent);
+
+            // 리다이렉트 URL 결정
+            let redirectUrl;
+
+            if (isIOS) {
+                // iOS -> App Store
+                redirectUrl = 'https://apps.apple.com/kr/app/cls%EC%BF%A0%ED%8E%80%EC%B9%98/id6443390755';
+            } else if (isAndroid) {
+                // Android -> Play Store
+                redirectUrl = 'https://play.google.com/store/apps/details?id=com.coupang.ats.coupunch';
+            } else {
+                // 데스크톱 또는 기타 -> Play Store로 기본 이동
+                redirectUrl = 'https://play.google.com/store/apps/details?id=com.coupang.ats.coupunch';
+            }
+
+            // 즉시 리다이렉트
+            window.location.replace(redirectUrl);
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📱</div>
+        <h1>CLS 쿠펀치</h1>
+        <div class="loading"></div>
+        <p class="message">앱 스토어로 이동 중입니다...</p>
+    </div>
+</body>
+</html>
