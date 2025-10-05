@@ -32,6 +32,12 @@ const hlLmsBody = document.getElementById('hl-lms-body');
 const exportHlLmsBtn = document.getElementById('export-hl-lms-btn');
 const importHlLmsBtn = document.getElementById('import-hl-lms-btn');
 const hlLmsImportInput = document.getElementById('hl-lms-import-input');
+const dayLocationHourSelect = document.getElementById('day-location-hour');
+const nightLocationHourSelect = document.getElementById('night-location-hour');
+const dayLocationHeader = document.getElementById('day-location-header');
+const dayLocationBody = document.getElementById('day-location-body');
+const nightLocationHeader = document.getElementById('night-location-header');
+const nightLocationBody = document.getElementById('night-location-body');
 
 // 토스트 메시지 표시
 function showToast(message) {
@@ -641,6 +647,134 @@ async function displayWorkerStatus() {
             // 드래그 이벤트 추가
             setupDragEvents(nightRow, nightTbody);
         }
+    });
+
+    // Location 테이블 표시
+    displayLocationTables(data, workers, lmsMap);
+}
+
+// Location별 작업 현황 표시
+async function displayLocationTables(data, workers, lmsMap) {
+    const dayHour = parseInt(dayLocationHourSelect.value);
+    const nightHour = parseInt(nightLocationHourSelect.value);
+
+    // Location별, 작업자별 데이터 집계
+    const locationData = {};
+
+    data.forEach(task => {
+        const employee = task['Employee'] || '이름 없음';
+        const location = task['Location'] || '-';
+        const htpStart = task['HTP Start'];
+        const htpEnd = task['HTP End'];
+        const processTask = task['Process(Task)'];
+        const unitQty = parseFloat(task['Unit Qty']) || 0;
+
+        if (!htpStart || !htpEnd || processTask !== 'STOW(STOW)') return;
+
+        const startSeconds = parseTimeToSeconds(htpStart);
+        const endSeconds = parseTimeToSeconds(htpEnd);
+
+        // 각 시간대에 대해 계산
+        for (let hour = 0; hour < 24; hour++) {
+            const hourStartSeconds = hour * 3600;
+            const hourEndSeconds = (hour + 1) * 3600 - 1;
+
+            // 이 작업이 해당 시간대와 겹치는지 확인
+            const overlapStart = Math.max(startSeconds, hourStartSeconds);
+            const overlapEnd = Math.min(endSeconds, hourEndSeconds);
+
+            if (overlapStart <= overlapEnd) {
+                const overlapSeconds = overlapEnd - overlapStart + 1;
+                const totalSeconds = endSeconds - startSeconds + 1;
+                const ratio = overlapSeconds / totalSeconds;
+
+                const mh = (overlapSeconds / 3600);
+                const qty = unitQty * ratio;
+
+                if (!locationData[location]) {
+                    locationData[location] = {};
+                }
+                if (!locationData[location][employee]) {
+                    locationData[location][employee] = Array(24).fill(null).map(() => ({ mh: 0, qty: 0 }));
+                }
+
+                locationData[location][employee][hour].mh += mh;
+                locationData[location][employee][hour].qty += qty;
+            }
+        }
+    });
+
+    // Day Location 테이블 생성
+    displayLocationTable(
+        locationData,
+        workers,
+        lmsMap,
+        dayHour,
+        dayLocationHeader,
+        dayLocationBody,
+        'day'
+    );
+
+    // Night Location 테이블 생성
+    displayLocationTable(
+        locationData,
+        workers,
+        lmsMap,
+        nightHour,
+        nightLocationHeader,
+        nightLocationBody,
+        'night'
+    );
+}
+
+// Location 테이블 표시
+function displayLocationTable(locationData, workers, lmsMap, selectedHour, headerElement, bodyElement, type) {
+    // 작업자 목록 (LMS 작업자만, HL LMS 제외)
+    const validWorkers = workers.filter(worker => {
+        const lmsInfo = lmsMap[worker.name];
+        return !lmsInfo || !lmsInfo.isHlLms;
+    });
+
+    // 헤더 생성
+    headerElement.innerHTML = `<th class="px-3 py-2 text-left font-semibold border border-gray-300 sticky left-0 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">Location</th>`;
+
+    validWorkers.forEach(worker => {
+        const lmsInfo = lmsMap[worker.name];
+        const workerName = lmsInfo ? lmsInfo.workerName : worker.name;
+        headerElement.innerHTML += `<th class="px-2 py-2 text-center font-semibold border border-gray-300">${workerName}</th>`;
+    });
+
+    // 바디 생성
+    bodyElement.innerHTML = '';
+
+    const locations = Object.keys(locationData).sort();
+
+    locations.forEach(location => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+
+        let rowHtml = `<td class="px-3 py-2 font-medium border border-gray-300 sticky left-0 bg-white">${location}</td>`;
+
+        validWorkers.forEach(worker => {
+            const workerData = locationData[location][worker.name];
+
+            if (workerData && workerData[selectedHour]) {
+                const hourData = workerData[selectedHour];
+                if (hourData.qty > 0) {
+                    const qty = hourData.qty;
+                    rowHtml += `<td class="px-2 py-2 text-center border border-gray-300">
+                        <div class="font-semibold text-gray-800">${qty.toFixed(0)}</div>
+                    </td>`;
+                } else {
+                    rowHtml += `<td class="px-2 py-2 text-center border border-gray-300 text-gray-400">-</td>`;
+                }
+            } else {
+                rowHtml += `<td class="px-2 py-2 text-center border border-gray-300 text-gray-400">-</td>`;
+            }
+        });
+
+        row.innerHTML = rowHtml;
+        bodyElement.appendChild(row);
     });
 }
 
@@ -1292,6 +1426,15 @@ hlLmsImportInput.addEventListener('change', async (e) => {
         // 파일 입력 초기화 (같은 파일을 다시 선택할 수 있도록)
         hlLmsImportInput.value = '';
     }
+});
+
+// 시간 선택 변경 이벤트
+dayLocationHourSelect.addEventListener('change', () => {
+    displayWorkerStatus();
+});
+
+nightLocationHourSelect.addEventListener('change', () => {
+    displayWorkerStatus();
 });
 
 // 페이지 로드 시 저장된 데이터 표시

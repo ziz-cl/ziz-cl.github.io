@@ -99,6 +99,74 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Location 테이블들 -->
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+                <!-- Day Location 테이블 -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-blue-700">Day Location별 작업 현황</h2>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-700">시간 선택:</label>
+                            <select id="day-location-hour" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="09">09시</option>
+                                <option value="10">10시</option>
+                                <option value="11">11시</option>
+                                <option value="12">12시</option>
+                                <option value="13">13시</option>
+                                <option value="14">14시</option>
+                                <option value="15">15시</option>
+                                <option value="16">16시</option>
+                                <option value="17">17시</option>
+                                <option value="18">18시</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm border-collapse" id="day-location-table">
+                            <thead class="bg-blue-50">
+                                <tr id="day-location-header">
+                                    <th class="px-3 py-2 text-left font-semibold border border-gray-300 sticky left-0 bg-blue-50">Location</th>
+                                    <!-- 작업자들이 동적으로 추가됨 -->
+                                </tr>
+                            </thead>
+                            <tbody id="day-location-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Night Location 테이블 -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-indigo-700">Night Location별 작업 현황</h2>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-700">시간 선택:</label>
+                            <select id="night-location-hour" class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="00">00시</option>
+                                <option value="01">01시</option>
+                                <option value="02">02시</option>
+                                <option value="03">03시</option>
+                                <option value="04">04시</option>
+                                <option value="05">05시</option>
+                                <option value="06">06시</option>
+                                <option value="07">07시</option>
+                                <option value="08">08시</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm border-collapse" id="night-location-table">
+                            <thead class="bg-indigo-50">
+                                <tr id="night-location-header">
+                                    <th class="px-3 py-2 text-left font-semibold border border-gray-300 sticky left-0 bg-indigo-50">Location</th>
+                                    <!-- 작업자들이 동적으로 추가됨 -->
+                                </tr>
+                            </thead>
+                            <tbody id="night-location-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- LMS 탭 -->
