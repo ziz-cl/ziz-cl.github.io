@@ -1,8 +1,8 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(5).stores({
-    data: '++id, employee',
-    lmsData: '++id, employeeId, shift',
+db.version(6).stores({
+    data: '++id, employee, date',
+    lmsData: '++id, employeeId, shift, date',
     hlLmsData: '++id, employeeId',
     metadata: 'key, value'
 });
@@ -121,6 +121,25 @@ async function parseAndSaveData(jsonData) {
             }
         }
 
+        // Date 컬럼에서 날짜 추출 (YYYY-MM-DD 형식)
+        if (task['Date']) {
+            // Excel 날짜 형식일 수도 있으므로 처리
+            const dateStr = String(task['Date']);
+            // 이미 YYYY-MM-DD 형식이면 그대로 사용
+            if (dateStr.match(/\d{4}-\d{2}-\d{2}/)) {
+                task['date'] = dateStr;
+            } else {
+                // 다른 형식이면 파싱 시도
+                const parsedDate = new Date(task['Date']);
+                if (!isNaN(parsedDate.getTime())) {
+                    const year = parsedDate.getFullYear();
+                    const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(parsedDate.getDate()).padStart(2, '0');
+                    task['date'] = `${year}-${month}-${day}`;
+                }
+            }
+        }
+
         tasks.push(task);
     }
 
@@ -201,6 +220,23 @@ async function displayWorkerStatus() {
         return;
     }
 
+    // 데이터에서 사용 가능한 날짜 찾기
+    const dates = [...new Set(data.map(task => task.date).filter(d => d))].sort();
+    console.log('사용 가능한 날짜들:', dates);
+
+    if (dates.length === 0) {
+        console.log('날짜 정보가 없습니다. 전체 데이터를 사용합니다.');
+    }
+
+    // 최신 날짜 (Day 시프트용)
+    const latestDate = dates.length > 0 ? dates[dates.length - 1] : null;
+
+    // 전일 날짜 (HL LMS Night 시프트용)
+    const previousDate = dates.length > 1 ? dates[dates.length - 2] : null;
+
+    console.log('최신 날짜 (Day/LMS Night):', latestDate);
+    console.log('전일 날짜 (HL LMS Night):', previousDate);
+
     // LMS 데이터 로드 (이름 매칭 및 시프트 시간 범위)
     const lmsData = await db.lmsData.toArray();
     const lmsMap = {};
@@ -234,16 +270,20 @@ async function displayWorkerStatus() {
 
     // HL LMS 데이터 로드 (이름 매칭 및 시프트 시간 범위)
     const hlLmsData = await db.hlLmsData.toArray();
+    const hlLmsEmployeeIds = new Set(); // HL LMS에 속한 작업자 ID 추적
+
     hlLmsData.forEach(item => {
         const employeeId = item.employeeId;
 
         if (employeeId) {
+            hlLmsEmployeeIds.add(employeeId); // HL LMS 작업자로 표시
             // HL LMS 데이터로 덮어쓰거나 추가 (HL LMS가 우선순위)
             lmsMap[employeeId] = {
                 workerName: item.nickname,
                 shift: item.wave,
                 shiftStart: item.shiftStart,
-                shiftEnd: item.shiftEnd
+                shiftEnd: item.shiftEnd,
+                isHlLms: true // HL LMS 작업자 표시
             };
         }
     });
@@ -251,23 +291,32 @@ async function displayWorkerStatus() {
     console.log('LMS 매핑 (LMS + HL LMS):', lmsMap);
     console.log('LMS 원본 데이터:', lmsData);
     console.log('HL LMS 원본 데이터:', hlLmsData);
+    console.log('HL LMS 작업자 IDs:', Array.from(hlLmsEmployeeIds));
 
-    // 작업자별 데이터 집계
+    // 작업자별 데이터 집계 (날짜별로 분리)
     const workerStats = {};
 
     data.forEach(task => {
         const employee = task['Employee'] || '이름 없음';
+        const taskDate = task.date;
 
         if (!workerStats[employee]) {
             workerStats[employee] = {
                 name: employee,
+                dates: {} // 날짜별 데이터 저장
+            };
+        }
+
+        // 날짜별로 데이터 초기화
+        if (!workerStats[employee].dates[taskDate]) {
+            workerStats[employee].dates[taskDate] = {
                 totalMH: 0,
                 totalQty: 0,
                 totalHTP: 0,
-                hourlyData: Array(24).fill(null).map(() => ({
-                    totalMH: 0,      // 해당 시간대 총 작업시간
-                    totalQty: 0      // 해당 시간대 총 수량
-                })) // 00~23시 (전체)
+                hourlyData: Array(33).fill(null).map(() => ({
+                    totalMH: 0,
+                    totalQty: 0
+                })) // 00~32시 (24~32시는 다음날 00~08시 매핑용)
             };
         }
 
@@ -283,18 +332,13 @@ async function displayWorkerStatus() {
                 const mh = calculateMH(htpStart, htpEnd);
                 const qty = unitQty;
 
-                workerStats[employee].totalMH += mh;
-                workerStats[employee].totalQty += qty;
+                workerStats[employee].dates[taskDate].totalMH += mh;
+                workerStats[employee].dates[taskDate].totalQty += qty;
 
-                // 시간대별로 MH와 수량 분배
-                distributeToHourRanges(workerStats[employee].hourlyData, htpStart, htpEnd, mh, qty);
+                // 시간대별로 MH와 수량 분배 (24~32시 포함)
+                distributeToHourRangesExtended(workerStats[employee].dates[taskDate].hourlyData, htpStart, htpEnd, mh, qty);
             }
         }
-    });
-
-    // 전체 평균 HTP 계산
-    Object.values(workerStats).forEach(worker => {
-        worker.totalHTP = worker.totalMH > 0 ? worker.totalQty / worker.totalMH : 0;
     });
 
     // 작업자 목록
@@ -308,6 +352,10 @@ async function displayWorkerStatus() {
         // LMS에서 이름 및 시프트 시간 찾기
         const lmsInfo = lmsMap[worker.name];
         const workerName = lmsInfo ? lmsInfo.workerName : '-';
+
+        // Day 시프트는 최신 날짜 데이터 사용
+        const dayData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+        if (!dayData) return; // 최신 날짜 데이터가 없으면 건너뜀
 
         // 시프트 시간 범위 계산 (시 단위)
         let validHours = null;
@@ -347,8 +395,8 @@ async function displayWorkerStatus() {
             // 시프트 범위 체크
             const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
             if (isInShiftRange) {
-                dayMH += worker.hourlyData[i].totalMH;
-                dayQty += worker.hourlyData[i].totalQty;
+                dayMH += dayData.hourlyData[i].totalMH;
+                dayQty += dayData.hourlyData[i].totalQty;
             }
         }
 
@@ -369,7 +417,7 @@ async function displayWorkerStatus() {
 
             // Day 시간대: 09~18시
             for (let i = 9; i <= 18; i++) {
-                const hourData = worker.hourlyData[i];
+                const hourData = dayData.hourlyData[i];
 
                 // 시프트 범위 체크 (시프트 시간이 있으면 범위 내에서만 표시)
                 const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
@@ -397,6 +445,31 @@ async function displayWorkerStatus() {
         // LMS에서 이름 및 시프트 시간 찾기
         const lmsInfo = lmsMap[worker.name];
         const workerName = lmsInfo ? lmsInfo.workerName : '-';
+        const isHlLms = lmsInfo && lmsInfo.isHlLms;
+
+        // Night 시프트 데이터 선택
+        // LMS 작업자: 최신 날짜의 00~08시 사용
+        // HL LMS 작업자: 전일의 24~32시를 00~08시로 매핑
+        let nightData = null;
+        let useExtendedHours = false;
+
+        if (isHlLms) {
+            // HL LMS 작업자: 전일 24~32시 데이터 사용
+            if (previousDate && worker.dates[previousDate]) {
+                nightData = worker.dates[previousDate];
+                useExtendedHours = true; // 24~32시 인덱스 사용
+                console.log(`${worker.name} (HL LMS): 전일(${previousDate}) 24~32시 데이터 사용`);
+            }
+        } else {
+            // LMS 작업자: 최신 날짜 00~08시 데이터 사용
+            if (latestDate && worker.dates[latestDate]) {
+                nightData = worker.dates[latestDate];
+                useExtendedHours = false; // 00~08시 인덱스 사용
+                console.log(`${worker.name} (LMS): 최신(${latestDate}) 00~08시 데이터 사용`);
+            }
+        }
+
+        if (!nightData) return; // 데이터가 없으면 건너뜀
 
         // 시프트 시간 범위 계산 (시 단위)
         let validHours = null;
@@ -452,8 +525,10 @@ async function displayWorkerStatus() {
                 }
             }
             if (isInShiftRange) {
-                nightMH += worker.hourlyData[i].totalMH;
-                nightQty += worker.hourlyData[i].totalQty;
+                // HL LMS는 24~32시 인덱스, LMS는 00~08시 인덱스 사용
+                const hourIndex = useExtendedHours ? (24 + i) : i;
+                nightMH += nightData.hourlyData[hourIndex].totalMH;
+                nightQty += nightData.hourlyData[hourIndex].totalQty;
             }
         }
 
@@ -472,9 +547,11 @@ async function displayWorkerStatus() {
                 </td>
             `;
 
-            // Night 시간대: 00(24)~08시
+            // Night 시간대: 00~08시 (HL LMS는 전일 24~32시 데이터 표시)
             for (let i = 0; i <= 8; i++) {
-                const hourData = worker.hourlyData[i];
+                // HL LMS는 24~32시 인덱스, LMS는 00~08시 인덱스 사용
+                const hourIndex = useExtendedHours ? (24 + i) : i;
+                const hourData = nightData.hourlyData[hourIndex];
 
                 // 시프트 범위 체크 (Night는 자정 넘어갈 수 있음)
                 let isInShiftRange = true;
@@ -567,8 +644,8 @@ function getHourRange(htpStart, htpEnd) {
     };
 }
 
-// 시간대별로 작업시간과 수량 분배
-function distributeToHourRanges(hourlyData, htpStart, htpEnd, totalMH, totalQty) {
+// 시간대별로 작업시간과 수량 분배 (24~32시 확장)
+function distributeToHourRangesExtended(hourlyData, htpStart, htpEnd, totalMH, totalQty) {
     const startSeconds = parseTimeToSeconds(htpStart);
     const endSeconds = parseTimeToSeconds(htpEnd);
 
@@ -581,10 +658,10 @@ function distributeToHourRanges(hourlyData, htpStart, htpEnd, totalMH, totalQty)
     }
 
     while (remainingSeconds > 0) {
-        const currentHour = Math.floor(currentSeconds / 3600) % 24;
+        const currentHour = Math.floor(currentSeconds / 3600);
 
         // 현재 시간대의 끝 (다음 정시)
-        const nextHourSeconds = (Math.floor(currentSeconds / 3600) + 1) * 3600;
+        const nextHourSeconds = (currentHour + 1) * 3600;
 
         // 현재 시간대에서 작업한 시간 (초)
         const segmentSeconds = Math.min(nextHourSeconds - currentSeconds, remainingSeconds);
@@ -592,17 +669,27 @@ function distributeToHourRanges(hourlyData, htpStart, htpEnd, totalMH, totalQty)
         // 비율 계산
         const ratio = segmentSeconds / (endSeconds - startSeconds > 0 ? endSeconds - startSeconds : endSeconds - startSeconds + 24 * 3600);
 
-        // 해당 시간대에 MH와 수량 누적 (전체 시간대)
-        if (currentHour >= 0 && currentHour <= 23) {
-            hourlyData[currentHour].totalMH += segmentSeconds / 3600; // 초를 시간으로 변환
-            hourlyData[currentHour].totalQty += totalQty * ratio;
+        // 00~23시 범위에 데이터 저장
+        const hour24 = currentHour % 24;
+        if (hour24 >= 0 && hour24 <= 23 && hourlyData[hour24]) {
+            hourlyData[hour24].totalMH += segmentSeconds / 3600;
+            hourlyData[hour24].totalQty += totalQty * ratio;
+        }
+
+        // 24~32시 범위 (00~08시를 24~32시로도 저장)
+        if (hour24 >= 0 && hour24 <= 8) {
+            const extendedHour = 24 + hour24;
+            if (hourlyData[extendedHour]) {
+                hourlyData[extendedHour].totalMH += segmentSeconds / 3600;
+                hourlyData[extendedHour].totalQty += totalQty * ratio;
+            }
         }
 
         // 다음 구간으로 이동
         currentSeconds = nextHourSeconds;
         remainingSeconds -= segmentSeconds;
 
-        // 무한루프 방지
+        // 무한루프 방지 (24시간 초과 시 리셋)
         if (currentSeconds >= 24 * 3600) {
             currentSeconds = currentSeconds % (24 * 3600);
         }
