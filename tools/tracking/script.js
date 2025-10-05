@@ -452,8 +452,8 @@ async function displayWorkerStatus() {
             const totalTextColor = dayTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
 
             let dayHtml = `
-                <td class="px-1 py-2 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
-                <td class="px-1 py-2 font-medium border border-gray-300">${worker.name}</td>
+                <td class="px-1 py-2 font-medium text-center sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-1 py-2 font-medium text-center border border-gray-300">${worker.name}</td>
                 <td class="px-1 py-2 text-center border border-gray-300 ${totalBgColor}">
                     <div class="font-semibold ${totalTextColor}">${dayTotalHTP.toFixed(0)}</div>
                 </td>
