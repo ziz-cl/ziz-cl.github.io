@@ -278,16 +278,17 @@ async function displayWorkerStatus() {
         const unitQty = parseFloat(task['Unit Qty']) || 0;
 
         if (htpStart && htpEnd) {
-            const mh = calculateMH(htpStart, htpEnd);
+            // Process(Task)가 "STOW(STOW)"인 경우만 MH와 수량 모두 반영
+            if (processTask === 'STOW(STOW)') {
+                const mh = calculateMH(htpStart, htpEnd);
+                const qty = unitQty;
 
-            // Process(Task)가 "STOW(STOW)"인 경우만 수량 반영
-            const qty = processTask === 'STOW(STOW)' ? unitQty : 0;
+                workerStats[employee].totalMH += mh;
+                workerStats[employee].totalQty += qty;
 
-            workerStats[employee].totalMH += mh;
-            workerStats[employee].totalQty += qty;
-
-            // 시간대별로 MH와 수량 분배
-            distributeToHourRanges(workerStats[employee].hourlyData, htpStart, htpEnd, mh, qty);
+                // 시간대별로 MH와 수량 분배
+                distributeToHourRanges(workerStats[employee].hourlyData, htpStart, htpEnd, mh, qty);
+            }
         }
     });
 
