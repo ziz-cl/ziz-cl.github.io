@@ -1820,6 +1820,10 @@ async function displayDailyReport() {
 
     const workerList = Object.values(workers);
 
+    console.log('Daily Report - 총 작업자 수:', workerList.length);
+    console.log('Daily Report - 첫 번째 작업자 데이터:', workerList[0]);
+    console.log('Daily Report - 날짜:', latestDate, previousDate);
+
     // 09~08시 (24시간) 작업수 집계
     const hourlyActual = Array(24).fill(0);
 
@@ -1833,6 +1837,8 @@ async function displayDailyReport() {
             }
         });
     }
+
+    console.log('Daily Report - Day 집계 후:', hourlyActual.slice(0, 10));
 
     // Night 시간대 (19~23시) - 최신 날짜
     for (let hour = 19; hour <= 23; hour++) {
@@ -1869,6 +1875,8 @@ async function displayDailyReport() {
             }
         });
     }
+
+    console.log('Daily Report - 최종 시간별 작업수:', hourlyActual);
 
     // 차트 데이터 준비
     const labels = ['09시', '10시', '11시', '12시', '13시', '14시', '15시', '16시', '17시', '18시', '19시', '20시', '21시', '22시', '23시', '00시', '01시', '02시', '03시', '04시', '05시', '06시', '07시', '08시'];
