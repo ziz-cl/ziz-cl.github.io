@@ -1,6 +1,6 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(3).stores({
+db.version(4).stores({
     data: '++id, employee',
     lmsData: '++id, employeeId, shift',
     metadata: 'key, value'
@@ -192,7 +192,7 @@ async function displayWorkerStatus() {
         return;
     }
 
-    // LMS 데이터 로드 (이름 매칭용)
+    // LMS 데이터 로드 (이름 매칭 및 시프트 시간 범위)
     const lmsData = await db.lmsData.toArray();
     const lmsMap = {};
     lmsData.forEach(item => {
@@ -214,7 +214,12 @@ async function displayWorkerStatus() {
         }
 
         if (employeeId) {
-            lmsMap[employeeId] = item.workerName;
+            lmsMap[employeeId] = {
+                workerName: item.workerName,
+                shift: item.shift,
+                shiftStart: item.shiftStart,
+                shiftEnd: item.shiftEnd
+            };
         }
     });
 
@@ -288,8 +293,18 @@ async function displayWorkerStatus() {
 
             const dayTotalHTP = dayMH > 0 ? dayQty / dayMH : 0;
 
-            // LMS에서 이름 찾기
-            const workerName = lmsMap[worker.name] || '-';
+            // LMS에서 이름 및 시프트 시간 찾기
+            const lmsInfo = lmsMap[worker.name];
+            const workerName = lmsInfo ? lmsInfo.workerName : '-';
+
+            // 시프트 시간 범위 계산 (시 단위)
+            let validHours = null;
+            if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+                const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+                const endHour = parseInt(lmsInfo.shiftEnd.split(':')[0]);
+                validHours = { start: startHour, end: endHour };
+                console.log(`${worker.name} 시프트: ${startHour}시-${endHour}시`);
+            }
 
             let dayHtml = `
                 <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
@@ -302,7 +317,11 @@ async function displayWorkerStatus() {
             // Day 시간대: 09~18시
             for (let i = 9; i <= 18; i++) {
                 const hourData = worker.hourlyData[i];
-                if (hourData.totalMH > 0) {
+
+                // 시프트 범위 체크 (시프트 시간이 있으면 범위 내에서만 표시)
+                const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
+
+                if (hourData.totalMH > 0 && isInShiftRange) {
                     const htp = hourData.totalQty / hourData.totalMH;
                     dayHtml += `<td class="px-2 py-2 text-center">
                         <div class="font-semibold text-blue-700">${htp.toFixed(0)}</div>
@@ -337,8 +356,17 @@ async function displayWorkerStatus() {
 
             const nightTotalHTP = nightMH > 0 ? nightQty / nightMH : 0;
 
-            // LMS에서 이름 찾기
-            const workerName = lmsMap[worker.name] || '-';
+            // LMS에서 이름 및 시프트 시간 찾기
+            const lmsInfo = lmsMap[worker.name];
+            const workerName = lmsInfo ? lmsInfo.workerName : '-';
+
+            // 시프트 시간 범위 계산 (시 단위)
+            let validHours = null;
+            if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+                const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+                const endHour = parseInt(lmsInfo.shiftEnd.split(':')[0]);
+                validHours = { start: startHour, end: endHour };
+            }
 
             let nightHtml = `
                 <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
@@ -351,7 +379,20 @@ async function displayWorkerStatus() {
             // Night 시간대: 00(24)~08시
             for (let i = 0; i <= 8; i++) {
                 const hourData = worker.hourlyData[i];
-                if (hourData.totalMH > 0) {
+
+                // 시프트 범위 체크 (Night는 자정 넘어갈 수 있음)
+                let isInShiftRange = true;
+                if (validHours) {
+                    // 자정을 넘어가는 경우 (예: 01:30 ~ 09:00)
+                    if (validHours.start < validHours.end) {
+                        isInShiftRange = (i >= validHours.start && i <= validHours.end);
+                    } else {
+                        // 자정을 넘는 경우 (예: 22:00 ~ 06:00)
+                        isInShiftRange = (i >= validHours.start || i <= validHours.end);
+                    }
+                }
+
+                if (hourData.totalMH > 0 && isInShiftRange) {
                     const htp = hourData.totalQty / hourData.totalMH;
                     nightHtml += `<td class="px-2 py-2 text-center">
                         <div class="font-semibold text-indigo-700">${htp.toFixed(0)}</div>
@@ -576,11 +617,13 @@ async function parseLmsData(inputText) {
             console.log(`줄 ${i}: 컬럼 수 ${parts.length}`, parts);
 
             // 출근일, 사용자 아이디, 전화번호, 작업자이름, Wave, 교대, 시프트 시작시간, 시프트 종료 시간, 실제 출근시간
-            // 최소 6개 컬럼이 있어야 함 (교대까지)
-            if (parts.length >= 6) {
+            // 최소 8개 컬럼이 있어야 함 (시프트 종료시간까지)
+            if (parts.length >= 8) {
                 let employeeId = parts[1];
                 const workerName = parts[3];
                 const shift = parts[5];
+                const shiftStart = parts[6];
+                const shiftEnd = parts[7];
 
                 // employeeId에서 010 다음의 8자리 숫자 추출
                 // 01012345678 -> 12345678
@@ -600,9 +643,11 @@ async function parseLmsData(inputText) {
                     lmsData.push({
                         shift: shift,
                         workerName: workerName,
-                        employeeId: employeeId
+                        employeeId: employeeId,
+                        shiftStart: shiftStart,
+                        shiftEnd: shiftEnd
                     });
-                    console.log(`✓ 줄 ${i}: 추가됨 - ${employeeId}, ${workerName}, ${shift}`);
+                    console.log(`✓ 줄 ${i}: 추가됨 - ${employeeId}, ${workerName}, ${shift}, ${shiftStart}-${shiftEnd}`);
                 } else {
                     console.log(`✗ 줄 ${i}: 필수 데이터 누락 - 건너뜀`);
                 }
