@@ -1,7 +1,8 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(2).stores({
+db.version(3).stores({
     data: '++id, employee',
+    lmsData: '++id, employeeId, shift',
     metadata: 'key, value'
 });
 
@@ -130,7 +131,7 @@ mainTabs.addEventListener('click', (e) => {
     }
 });
 
-function switchTab(tabName) {
+async function switchTab(tabName) {
     // 탭 버튼 스타일 업데이트
     mainTabs.querySelectorAll('button').forEach(btn => {
         if (btn.dataset.tab === tabName) {
@@ -150,6 +151,12 @@ function switchTab(tabName) {
         displayWorkerStatus();
     } else if (tabName === 'lms') {
         lmsTab.classList.remove('hidden');
+        // 저장된 LMS 데이터가 있으면 표시
+        const savedLmsData = await db.lmsData.toArray();
+        if (savedLmsData.length > 0) {
+            displayLmsData(savedLmsData);
+            lmsResult.classList.remove('hidden');
+        }
     } else if (tabName === 'raw-data') {
         rawDataTab.classList.remove('hidden');
         displayRawData();
@@ -457,9 +464,8 @@ clearDataBtn.addEventListener('click', async () => {
     }
 });
 
-// LMS 데이터 파싱
-parseLmsBtn.addEventListener('click', () => {
-    const inputText = lmsInput.value;
+// LMS 데이터 파싱 함수
+async function parseLmsData(inputText) {
     if (!inputText.trim()) {
         showToast('데이터를 입력해주세요.');
         return;
@@ -534,6 +540,10 @@ parseLmsBtn.addEventListener('click', () => {
             return;
         }
 
+        // IndexedDB에 저장
+        await db.lmsData.clear(); // 기존 데이터 삭제
+        await db.lmsData.bulkAdd(lmsData);
+
         // 테이블에 표시
         displayLmsData(lmsData);
         lmsResult.classList.remove('hidden');
@@ -542,13 +552,28 @@ parseLmsBtn.addEventListener('click', () => {
         console.error('LMS 파싱 오류:', error);
         showToast('데이터 파싱 중 오류가 발생했습니다.');
     }
+}
+
+// LMS 붙여넣기 이벤트 (자동 파싱)
+lmsInput.addEventListener('paste', async (e) => {
+    // 짧은 지연 후 파싱 (붙여넣기가 완료된 후 실행)
+    setTimeout(async () => {
+        await parseLmsData(lmsInput.value);
+    }, 100);
+});
+
+// LMS 데이터 파싱 버튼
+parseLmsBtn.addEventListener('click', async () => {
+    await parseLmsData(lmsInput.value);
 });
 
 // LMS 입력 초기화
-clearLmsBtn.addEventListener('click', () => {
+clearLmsBtn.addEventListener('click', async () => {
     lmsInput.value = '';
     lmsTableBody.innerHTML = '';
     lmsResult.classList.add('hidden');
+    await db.lmsData.clear();
+    showToast('LMS 데이터가 초기화되었습니다.');
 });
 
 // LMS 데이터 테이블 표시
