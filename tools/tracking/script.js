@@ -99,6 +99,9 @@ async function handleFile(file) {
             // UI 표시
             showUI();
 
+            // Daily Report 차트 업데이트
+            displayDailyReport();
+
         } catch (error) {
             console.error('파일 처리 오류:', error);
             showToast('파일 처리 중 오류가 발생했습니다.');
@@ -1698,6 +1701,127 @@ nightLocationHourSelect.addEventListener('change', () => {
     displayWorkerStatus();
 });
 
+// Daily Report 차트 표시
+let dailyReportChart = null;
+
+async function displayDailyReport() {
+    const data = await db.data.toArray();
+    if (data.length === 0) return;
+
+    // 날짜 정보
+    const dates = [...new Set(data.map(task => task.date).filter(d => d))].sort();
+    const latestDate = dates.length > 0 ? dates[dates.length - 1] : 'undefined';
+    const previousDate = dates.length > 1 ? dates[dates.length - 2] : 'undefined';
+
+    // 09~08시 (24시간) 작업수 집계
+    const hourlyActual = Array(24).fill(0);
+
+    data.forEach(task => {
+        const taskType = task['Task Type'];
+        if (taskType !== 'STOW(STOW)') return;
+
+        const htpStart = task['HTP Start'];
+        const htpEnd = task['HTP End'];
+        const unitQty = parseFloat(task['Unit Qty']) || 0;
+        const taskDate = task.date || 'undefined';
+
+        if (!htpStart || !htpEnd || unitQty <= 0) return;
+
+        const startSeconds = parseTimeToSeconds(htpStart);
+        const endSeconds = parseTimeToSeconds(htpEnd);
+
+        if (startSeconds === null || endSeconds === null) return;
+
+        const durationSeconds = endSeconds - startSeconds;
+        if (durationSeconds <= 0) return;
+
+        // 09~32시 범위로 계산 (24시간 연속)
+        for (let hour = 9; hour < 33; hour++) {
+            const hourStart = hour * 3600;
+            const hourEnd = (hour + 1) * 3600;
+
+            const overlapStart = Math.max(startSeconds, hourStart);
+            const overlapEnd = Math.min(endSeconds, hourEnd);
+
+            if (overlapStart < overlapEnd) {
+                const overlapSeconds = overlapEnd - overlapStart;
+                const proportion = overlapSeconds / durationSeconds;
+                const qty = unitQty * proportion;
+
+                // 09~32시를 09~08시로 매핑
+                const actualHour = hour % 24;
+                const hourIndex = actualHour >= 9 ? actualHour - 9 : actualHour + 15;
+
+                // 최신 날짜 데이터만 집계
+                if (hour < 24 && taskDate === latestDate) {
+                    hourlyActual[hourIndex] += qty;
+                }
+                // 전일 24~32시 데이터는 00~08시로
+                if (hour >= 24 && hour < 33 && taskDate === previousDate) {
+                    hourlyActual[hourIndex] += qty;
+                }
+            }
+        }
+    });
+
+    // 차트 데이터 준비
+    const labels = ['09시', '10시', '11시', '12시', '13시', '14시', '15시', '16시', '17시', '18시', '19시', '20시', '21시', '22시', '23시', '00시', '01시', '02시', '03시', '04시', '05시', '06시', '07시', '08시'];
+
+    const ctx = document.getElementById('daily-report-chart');
+
+    // 기존 차트가 있으면 제거
+    if (dailyReportChart) {
+        dailyReportChart.destroy();
+    }
+
+    // 새 차트 생성
+    dailyReportChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Actual',
+                data: hourlyActual,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                tension: 0.1,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                },
+                title: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '작업수 (Actual)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '시간'
+                    }
+                }
+            }
+        }
+    });
+}
+
 // 페이지 로드 시 저장된 데이터 표시
 window.addEventListener('load', async () => {
     const data = await db.data.toArray();
@@ -1705,6 +1829,7 @@ window.addEventListener('load', async () => {
         currentData = data;
         showUI();
         displayWorkerStatus();
+        displayDailyReport();
     }
 
     // LMS 탭 데이터도 확인
