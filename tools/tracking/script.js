@@ -201,8 +201,8 @@ async function displayWorkerStatus() {
         if (htpStart && htpEnd) {
             const mh = calculateMH(htpStart, htpEnd);
 
-            // Process(Task)가 "Stow(Stow)"인 경우만 수량 반영
-            const qty = processTask === 'STOW(Stow)' ? unitQty : 0;
+            // Process(Task)가 "STOW(STOW)"인 경우만 수량 반영
+            const qty = processTask === 'STOW(STOW)' ? unitQty : 0;
 
             workerStats[employee].totalMH += mh;
             workerStats[employee].totalQty += qty;
