@@ -119,9 +119,7 @@ async function parseAndSaveData(jsonData) {
 
 // UI 표시
 function showUI() {
-    mainTabsSection.classList.remove('hidden');
     clearDataBtn.classList.remove('hidden');
-    switchTab('worker-status');
 }
 
 // 탭 전환
@@ -166,7 +164,14 @@ async function switchTab(tabName) {
 // 작업자 현황 표시
 async function displayWorkerStatus() {
     const data = await db.data.toArray();
-    if (data.length === 0) return;
+    if (data.length === 0) {
+        // 데이터가 없으면 빈 테이블 표시
+        const dayTbody = document.getElementById('day-status-body');
+        const nightTbody = document.getElementById('night-status-body');
+        if (dayTbody) dayTbody.innerHTML = '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
+        if (nightTbody) nightTbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
+        return;
+    }
 
     // 작업자별 데이터 집계
     const workerStats = {};
@@ -598,5 +603,13 @@ window.addEventListener('load', async () => {
     if (data.length > 0) {
         currentData = data;
         showUI();
+        displayWorkerStatus();
+    }
+
+    // LMS 탭 데이터도 확인
+    const lmsData = await db.lmsData.toArray();
+    if (lmsData.length > 0) {
+        displayLmsData(lmsData);
+        lmsResult.classList.remove('hidden');
     }
 });
