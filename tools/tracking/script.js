@@ -28,6 +28,9 @@ const lmsResult = document.getElementById('lms-result');
 const lmsTableBody = document.getElementById('lms-table-body');
 const addHlLmsRowBtn = document.getElementById('add-hl-lms-row');
 const hlLmsBody = document.getElementById('hl-lms-body');
+const exportHlLmsBtn = document.getElementById('export-hl-lms-btn');
+const importHlLmsBtn = document.getElementById('import-hl-lms-btn');
+const hlLmsImportInput = document.getElementById('hl-lms-import-input');
 
 // 토스트 메시지 표시
 function showToast(message) {
@@ -283,7 +286,7 @@ async function displayWorkerStatus() {
             // HL LMS 데이터로 덮어쓰거나 추가 (HL LMS가 우선순위)
             lmsMap[employeeId] = {
                 workerName: item.nickname,
-                shift: item.wave,
+                shift: item.shift || item.wave, // shift 우선, 없으면 wave (하위 호환성)
                 shiftStart: item.shiftStart,
                 shiftEnd: item.shiftEnd,
                 isHlLms: true // HL LMS 작업자 표시
@@ -936,7 +939,7 @@ async function autoSaveHlLmsData() {
         const rowData = {
             nickname: inputs[0].value.trim(),
             employeeId: inputs[1].value.trim(),
-            wave: inputs[2].value.trim(),
+            shift: inputs[2].value.trim(),
             shiftStart: inputs[3].value,
             shiftEnd: inputs[4].value
         };
@@ -974,15 +977,15 @@ function createHlLmsRow(data = {}) {
         </td>
         <td class="border border-gray-300 px-2 py-1">
             <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
-                   placeholder="Wave1" value="${data.wave || ''}" data-field="wave">
+                   placeholder="Day/Night" value="${data.shift || data.wave || ''}" data-field="shift">
         </td>
         <td class="border border-gray-300 px-2 py-1">
-            <input type="time" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
-                   value="${data.shiftStart || ''}" data-field="shiftStart">
+            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   placeholder="00:00~32:00" value="${data.shiftStart || ''}" data-field="shiftStart" pattern="^([0-2]?[0-9]|3[0-2]):[0-5][0-9]$">
         </td>
         <td class="border border-gray-300 px-2 py-1">
-            <input type="time" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
-                   value="${data.shiftEnd || ''}" data-field="shiftEnd">
+            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   placeholder="00:00~32:00" value="${data.shiftEnd || ''}" data-field="shiftEnd" pattern="^([0-2]?[0-9]|3[0-2]):[0-5][0-9]$">
         </td>
         <td class="border border-gray-300 px-2 py-1 text-center">
             <button class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs delete-hl-lms-row">
@@ -1024,6 +1027,137 @@ async function loadHlLmsData() {
 // 행 추가 버튼
 addHlLmsRowBtn.addEventListener('click', () => {
     hlLmsBody.appendChild(createHlLmsRow());
+});
+
+// HL LMS CSV 내보내기
+exportHlLmsBtn.addEventListener('click', async () => {
+    const data = await db.hlLmsData.toArray();
+
+    if (data.length === 0) {
+        showToast('내보낼 데이터가 없습니다.');
+        return;
+    }
+
+    // CSV 헤더
+    const headers = ['NickName', '작업자아이디', 'Shift', '시프트시작시간', '시프트종료시간'];
+
+    // CSV 데이터 생성
+    const csvRows = [headers.join(',')];
+
+    data.forEach(item => {
+        const row = [
+            item.nickname || '',
+            item.employeeId || '',
+            item.shift || item.wave || '', // shift 우선, 없으면 wave (하위 호환성)
+            item.shiftStart || '',
+            item.shiftEnd || ''
+        ];
+        csvRows.push(row.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+
+    // BOM 추가 (한글 깨짐 방지)
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+
+    // 다운로드
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // 파일명에 날짜 포함
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    link.download = `HL_LMS_${dateStr}.csv`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast(`${data.length}건의 데이터를 내보냈습니다.`);
+});
+
+// HL LMS CSV 가져오기 버튼
+importHlLmsBtn.addEventListener('click', () => {
+    hlLmsImportInput.click();
+});
+
+// HL LMS CSV 파일 선택 이벤트
+hlLmsImportInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+        showToast('CSV 파일만 가져올 수 있습니다.');
+        return;
+    }
+
+    try {
+        const text = await file.text();
+
+        // BOM 제거
+        const cleanText = text.replace(/^\uFEFF/, '');
+
+        // 줄 단위로 분리
+        const lines = cleanText.split(/\r?\n/).filter(line => line.trim());
+
+        if (lines.length < 2) {
+            showToast('CSV 파일에 데이터가 없습니다.');
+            return;
+        }
+
+        // 헤더 제거
+        const dataLines = lines.slice(1);
+
+        const importedData = [];
+
+        dataLines.forEach((line, index) => {
+            const cols = line.split(',').map(col => col.trim());
+
+            if (cols.length >= 2) { // 최소한 닉네임과 작업자아이디가 있어야 함
+                importedData.push({
+                    nickname: cols[0] || '',
+                    employeeId: cols[1] || '',
+                    shift: cols[2] || '',
+                    shiftStart: cols[3] || '',
+                    shiftEnd: cols[4] || ''
+                });
+            }
+        });
+
+        if (importedData.length === 0) {
+            showToast('가져올 수 있는 데이터가 없습니다.');
+            return;
+        }
+
+        // 기존 데이터 로드
+        const existingData = await db.hlLmsData.toArray();
+        const existingIds = new Set(existingData.map(item => item.employeeId));
+
+        // 중복 제거 (작업자아이디 기준)
+        const newData = importedData.filter(item => !existingIds.has(item.employeeId));
+
+        if (newData.length === 0) {
+            showToast('모든 데이터가 이미 존재합니다.');
+            return;
+        }
+
+        // DB에 추가 (덮어쓰기 아닌 추가)
+        await db.hlLmsData.bulkAdd(newData);
+
+        // UI 갱신
+        await loadHlLmsData();
+
+        showToast(`${newData.length}건의 데이터를 추가했습니다. (중복 ${importedData.length - newData.length}건 제외)`);
+    } catch (error) {
+        console.error('CSV 가져오기 오류:', error);
+        showToast('CSV 파일을 가져오는 중 오류가 발생했습니다.');
+    } finally {
+        // 파일 입력 초기화 (같은 파일을 다시 선택할 수 있도록)
+        hlLmsImportInput.value = '';
+    }
 });
 
 // 페이지 로드 시 저장된 데이터 표시

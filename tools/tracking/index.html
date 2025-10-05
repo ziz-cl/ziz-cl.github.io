@@ -144,6 +144,13 @@
             <div class="mb-4 flex justify-between items-center">
                 <h2 class="text-lg font-semibold text-gray-900">HL LMS 작업자 정보</h2>
                 <div class="flex gap-3">
+                    <input type="file" id="hl-lms-import-input" accept=".csv" class="hidden">
+                    <button id="import-hl-lms-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all">
+                        📥 CSV 가져오기
+                    </button>
+                    <button id="export-hl-lms-btn" class="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-all">
+                        📤 CSV 내보내기
+                    </button>
                     <button id="add-hl-lms-row" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all">
                         + 행 추가
                     </button>
@@ -155,7 +162,7 @@
                         <tr>
                             <th class="border border-gray-300 px-4 py-2 text-left font-semibold">NickName</th>
                             <th class="border border-gray-300 px-4 py-2 text-left font-semibold">작업자아이디</th>
-                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">Wave</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">Shift</th>
                             <th class="border border-gray-300 px-4 py-2 text-left font-semibold">시프트 시작시간</th>
                             <th class="border border-gray-300 px-4 py-2 text-left font-semibold">시프트 종료시간</th>
                             <th class="border border-gray-300 px-4 py-2 text-center font-semibold">삭제</th>
