@@ -196,13 +196,23 @@ async function displayWorkerStatus() {
     const lmsData = await db.lmsData.toArray();
     const lmsMap = {};
     lmsData.forEach(item => {
-        // employeeId는 이미 8자리로 정제되어 저장됨
-        if (item.employeeId) {
-            lmsMap[item.employeeId] = item.workerName;
+        let employeeId = item.employeeId;
+
+        // employeeId가 8자리가 아니면 다시 추출 (기존 데이터 호환성)
+        if (employeeId && employeeId.length !== 8) {
+            const match = String(employeeId).match(/\d{8}/);
+            if (match) {
+                employeeId = match[0];
+            }
+        }
+
+        if (employeeId) {
+            lmsMap[employeeId] = item.workerName;
         }
     });
 
     console.log('LMS 매핑:', lmsMap);
+    console.log('LMS 원본 데이터:', lmsData);
 
     // 작업자별 데이터 집계
     const workerStats = {};
@@ -637,13 +647,25 @@ function displayLmsData(lmsData) {
     lmsData.forEach((item, index) => {
         const row = document.createElement('tr');
         row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+
+        // employeeId가 8자리가 아니면 다시 추출 (기존 데이터 호환성)
+        let employeeId = item.employeeId;
+        if (employeeId && employeeId.length !== 8) {
+            const match = String(employeeId).match(/\d{8}/);
+            if (match) {
+                employeeId = match[0];
+            }
+        }
+
         row.innerHTML = `
             <td class="px-4 py-2 border-b">${item.shift}</td>
             <td class="px-4 py-2 border-b">${item.workerName}</td>
-            <td class="px-4 py-2 border-b">${item.employeeId}</td>
+            <td class="px-4 py-2 border-b">${employeeId}</td>
         `;
         lmsTableBody.appendChild(row);
     });
+
+    console.log('LMS 테이블 표시 완료:', lmsData.length, '건');
 }
 
 // 페이지 로드 시 저장된 데이터 표시
