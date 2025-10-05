@@ -761,13 +761,56 @@ async function displayWorkerStatus() {
 
 // Location별 작업 현황 표시
 async function displayLocationTables(data, dayWorkers, nightWorkers, lmsMap) {
-    const dayHour = parseInt(dayLocationHourSelect.value);
-    const nightHour = parseInt(nightLocationHourSelect.value);
-
     // 날짜 정보
     const dates = [...new Set(data.map(task => task.date).filter(d => d))].sort();
     const latestDate = dates.length > 0 ? dates[dates.length - 1] : 'undefined';
     const previousDate = dates.length > 1 ? dates[dates.length - 2] : 'undefined';
+
+    // 최신 시간 찾기 (데이터가 있는 가장 늦은 시간)
+    let latestDayHour = 9;
+    let latestNightHour = 0;
+
+    // Day 시간대 (09-18)의 최신 시간 찾기
+    for (let hour = 18; hour >= 9; hour--) {
+        const hasData = dayWorkers.some(({ worker }) => {
+            const dayData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+            return dayData && dayData.hourlyData[hour] && dayData.hourlyData[hour].totalMH > 0;
+        });
+        if (hasData) {
+            latestDayHour = hour;
+            break;
+        }
+    }
+
+    // Night 시간대 (00-08)의 최신 시간 찾기
+    for (let hour = 8; hour >= 0; hour--) {
+        const hasData = nightWorkers.some(({ worker, isHlLms }) => {
+            let nightData = null;
+            if (isHlLms) {
+                nightData = previousDate && worker.dates[previousDate] ? worker.dates[previousDate] : null;
+                const hourIndex = 24 + hour;
+                return nightData && nightData.hourlyData[hourIndex] && nightData.hourlyData[hourIndex].totalMH > 0;
+            } else {
+                nightData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+                return nightData && nightData.hourlyData[hour] && nightData.hourlyData[hour].totalMH > 0;
+            }
+        });
+        if (hasData) {
+            latestNightHour = hour;
+            break;
+        }
+    }
+
+    // 선택된 시간이 없거나 초기값이면 최신 시간으로 설정
+    if (!dayLocationHourSelect.value || dayLocationHourSelect.value === '9') {
+        dayLocationHourSelect.value = latestDayHour.toString();
+    }
+    if (!nightLocationHourSelect.value || nightLocationHourSelect.value === '0') {
+        nightLocationHourSelect.value = latestNightHour.toString();
+    }
+
+    const dayHour = parseInt(dayLocationHourSelect.value);
+    const nightHour = parseInt(nightLocationHourSelect.value);
 
     // Location별, 작업자별, 날짜별 데이터 집계
     const locationData = {};
@@ -863,8 +906,12 @@ function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, 
     // 모든 Location 수집
     const locations = Object.keys(locationData).sort();
 
-    // 헤더 생성 (Location들을 열로)
-    headerElement.innerHTML = `<th class="px-3 py-2 text-left font-semibold border border-gray-300 sticky left-0 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">작업자</th>`;
+    // 헤더 생성 (이름, 작업자, Total Unit, Location들을 열로)
+    headerElement.innerHTML = `
+        <th class="px-3 py-2 text-left font-semibold border border-gray-300 sticky left-0 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">이름</th>
+        <th class="px-3 py-2 text-left font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">작업자</th>
+        <th class="px-2 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">Total Unit</th>
+    `;
 
     locations.forEach(location => {
         headerElement.innerHTML += `<th class="px-2 py-2 text-center font-semibold border border-gray-300">${location}</th>`;
@@ -873,14 +920,76 @@ function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, 
     // 바디 생성 (작업자들을 행으로)
     bodyElement.innerHTML = '';
 
-    validWorkers.forEach(({ worker, isHlLms }) => {
+    validWorkers.forEach(({ worker, isHlLms, lmsInfo }) => {
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50';
 
-        const lmsInfo = lmsMap[worker.name];
         const workerName = lmsInfo ? lmsInfo.workerName : worker.name;
 
-        let rowHtml = `<td class="px-3 py-2 font-medium border border-gray-300 sticky left-0 bg-white">${workerName}</td>`;
+        // 시프트 시간 범위 계산
+        let validHours = null;
+        if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+            const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+            const endTimeParts = lmsInfo.shiftEnd.split(':');
+            const endHour = parseInt(endTimeParts[0]);
+            const endMinute = parseInt(endTimeParts[1]) || 0;
+            const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+            validHours = { start: startHour, end: actualEndHour };
+        }
+
+        // Total Unit 계산 (시프트 시간 범위 내 모든 Unit Qty의 합)
+        let totalUnit = 0;
+
+        locations.forEach(location => {
+            const employeeData = locationData[location] && locationData[location][worker.name];
+            if (employeeData) {
+                if (type === 'day') {
+                    const dateData = employeeData[latestDate];
+                    if (dateData) {
+                        for (let i = 9; i <= 18; i++) {
+                            const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
+                            if (isInShiftRange && dateData[i]) {
+                                totalUnit += dateData[i].qty;
+                            }
+                        }
+                    }
+                } else {
+                    // Night
+                    if (isHlLms) {
+                        const dateData = employeeData[previousDate];
+                        if (dateData) {
+                            for (let i = 0; i <= 8; i++) {
+                                const hourIndex = 24 + i;
+                                const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
+                                if (isInShiftRange && dateData[hourIndex]) {
+                                    totalUnit += dateData[hourIndex].qty;
+                                }
+                            }
+                        }
+                    } else {
+                        const dateData = employeeData[latestDate];
+                        if (dateData) {
+                            for (let i = 0; i <= 8; i++) {
+                                const isInShiftRange = !validHours || (
+                                    validHours.start < validHours.end ?
+                                    (i >= validHours.start && i <= validHours.end) :
+                                    (i >= validHours.start || i <= validHours.end)
+                                );
+                                if (isInShiftRange && dateData[i]) {
+                                    totalUnit += dateData[i].qty;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        let rowHtml = `
+            <td class="px-3 py-2 font-medium border border-gray-300 sticky left-0 bg-white">${workerName}</td>
+            <td class="px-3 py-2 border border-gray-300 bg-white">${worker.name}</td>
+            <td class="px-2 py-2 text-center border border-gray-300 bg-white font-semibold">${totalUnit.toFixed(0)}</td>
+        `;
 
         locations.forEach(location => {
             const employeeData = locationData[location] && locationData[location][worker.name];
@@ -960,6 +1069,8 @@ function setupDragEvents(row, tbody) {
         e.preventDefault();
         // 순서가 변경되었으므로 저장
         await saveWorkerOrder(tbody);
+        // Location 테이블 실시간 업데이트
+        await displayWorkerStatus();
     });
 }
 
