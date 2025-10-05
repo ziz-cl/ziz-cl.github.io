@@ -1,13 +1,12 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(1).stores({
-    data: '++id, workDate, employee',
+db.version(2).stores({
+    data: '++id, employee',
     metadata: 'key, value'
 });
 
 // 전역 변수
 let currentData = [];
-let currentWorkDate = null;
 
 // DOM 요소
 const uploadBtn = document.getElementById('upload-btn');
@@ -16,9 +15,14 @@ const clearDataBtn = document.getElementById('clear-data-btn');
 const mainTabsSection = document.getElementById('main-tabs-section');
 const mainTabs = document.getElementById('main-tabs');
 const workerStatusTab = document.getElementById('worker-status-tab');
+const lmsTab = document.getElementById('lms-tab');
 const rawDataTab = document.getElementById('raw-data-tab');
-const workerSearch = document.getElementById('worker-search');
 const toast = document.getElementById('toast');
+const lmsInput = document.getElementById('lms-input');
+const parseLmsBtn = document.getElementById('parse-lms-btn');
+const clearLmsBtn = document.getElementById('clear-lms-btn');
+const lmsResult = document.getElementById('lms-result');
+const lmsTableBody = document.getElementById('lms-table-body');
 
 // 토스트 메시지 표시
 function showToast(message) {
@@ -48,14 +52,6 @@ async function handleFile(file) {
         return;
     }
 
-    // 파일명에서 날짜 추출 (worker_history_YYYYMMDDHHmmss)
-    const dateMatch = file.name.match(/worker_history_(\d{14})/);
-    if (dateMatch) {
-        const dateStr = dateMatch[1];
-        currentWorkDate = `${dateStr.substr(0,4)}-${dateStr.substr(4,2)}-${dateStr.substr(6,2)} ${dateStr.substr(8,2)}:${dateStr.substr(10,2)}:${dateStr.substr(12,2)}`;
-        console.log('작업 날짜:', currentWorkDate);
-    }
-
     showToast('파일을 처리하는 중...');
 
     const reader = new FileReader();
@@ -73,7 +69,12 @@ async function handleFile(file) {
                 targetSheet = workbook.Sheets[workbook.SheetNames[0]];
             }
 
-            const jsonData = XLSX.utils.sheet_to_json(targetSheet, { header: 1, defval: '' });
+            // raw: false로 설정하여 포맷된 문자열로 읽기
+            const jsonData = XLSX.utils.sheet_to_json(targetSheet, {
+                header: 1,
+                defval: '',
+                raw: false  // 포맷된 값 사용
+            });
 
             // 데이터 파싱 및 저장
             await parseAndSaveData(jsonData);
@@ -113,7 +114,6 @@ async function parseAndSaveData(jsonData) {
     currentData = tasks;
     await db.data.bulkAdd(tasks);
     await db.metadata.put({ key: 'lastUpdate', value: new Date().toLocaleString() });
-    await db.metadata.put({ key: 'workDate', value: currentWorkDate });
 }
 
 // UI 표시
@@ -142,11 +142,14 @@ function switchTab(tabName) {
 
     // 탭 컨텐츠 표시
     workerStatusTab.classList.add('hidden');
+    lmsTab.classList.add('hidden');
     rawDataTab.classList.add('hidden');
 
     if (tabName === 'worker-status') {
         workerStatusTab.classList.remove('hidden');
         displayWorkerStatus();
+    } else if (tabName === 'lms') {
+        lmsTab.classList.remove('hidden');
     } else if (tabName === 'raw-data') {
         rawDataTab.classList.remove('hidden');
         displayRawData();
@@ -154,7 +157,7 @@ function switchTab(tabName) {
 }
 
 // 작업자 현황 표시
-async function displayWorkerStatus(filter = '') {
+async function displayWorkerStatus() {
     const data = await db.data.toArray();
     if (data.length === 0) return;
 
@@ -169,84 +172,180 @@ async function displayWorkerStatus(filter = '') {
                 name: employee,
                 totalMH: 0,
                 totalQty: 0,
-                hourlyData: Array(9).fill(null).map(() => ({ mh: 0, qty: 0 })) // 00~08시
+                totalHTP: 0,
+                hourlyData: Array(24).fill(null).map(() => ({
+                    totalMH: 0,      // 해당 시간대 총 작업시간
+                    totalQty: 0      // 해당 시간대 총 수량
+                })) // 00~23시 (전체)
             };
         }
 
         // HTP Start, HTP End 파싱
         const htpStart = task['HTP Start'];
         const htpEnd = task['HTP End'];
+        const processTask = task['Process(Task)'];
         const unitQty = parseFloat(task['Unit Qty']) || 0;
 
         if (htpStart && htpEnd) {
             const mh = calculateMH(htpStart, htpEnd);
-            const { startHour, endHour } = getHourRange(htpStart, htpEnd);
+
+            // Process(Task)가 "Stow(Stow)"인 경우만 수량 반영
+            const qty = processTask === 'STOW(Stow)' ? unitQty : 0;
 
             workerStats[employee].totalMH += mh;
-            workerStats[employee].totalQty += unitQty;
+            workerStats[employee].totalQty += qty;
 
-            // 시간대별 할당
-            distributeToHours(workerStats[employee].hourlyData, htpStart, htpEnd, mh, unitQty);
+            // 시간대별로 MH와 수량 분배
+            distributeToHourRanges(workerStats[employee].hourlyData, htpStart, htpEnd, mh, qty);
         }
     });
 
-    // 필터 적용
-    let workers = Object.values(workerStats);
-    if (filter) {
-        workers = workers.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()));
-    }
+    // 전체 평균 HTP 계산
+    Object.values(workerStats).forEach(worker => {
+        worker.totalHTP = worker.totalMH > 0 ? worker.totalQty / worker.totalMH : 0;
+    });
 
-    // 테이블 생성
-    const tbody = document.getElementById('worker-status-body');
-    tbody.innerHTML = '';
+    // 작업자 목록
+    let workers = Object.values(workerStats);
+
+    // Day 테이블 생성
+    const dayTbody = document.getElementById('day-status-body');
+    dayTbody.innerHTML = '';
 
     workers.forEach(worker => {
-        const row = document.createElement('tr');
-        row.className = 'border-b hover:bg-gray-50';
-
-        let html = `
-            <td class="px-3 py-2 font-medium sticky left-0 bg-white">${worker.name}</td>
-            <td class="px-3 py-2 text-center">${worker.totalMH.toFixed(2)}</td>
-            <td class="px-3 py-2 text-center">${worker.totalQty.toFixed(0)}</td>
-        `;
-
-        // 00~08시 데이터
-        for (let i = 0; i < 9; i++) {
-            const hourData = worker.hourlyData[i];
-            if (hourData.mh > 0) {
-                html += `<td class="px-3 py-2 text-center text-xs">
-                    <div class="font-semibold text-indigo-600">${hourData.mh.toFixed(2)}</div>
-                    <div class="text-gray-500">${hourData.qty.toFixed(0)}</div>
-                </td>`;
-            } else {
-                html += `<td class="px-3 py-2 text-center text-gray-300">-</td>`;
-            }
+        // Day 시간대 합계 계산
+        let dayMH = 0;
+        let dayQty = 0;
+        for (let i = 9; i <= 18; i++) {
+            dayMH += worker.hourlyData[i].totalMH;
+            dayQty += worker.hourlyData[i].totalQty;
         }
 
-        row.innerHTML = html;
-        tbody.appendChild(row);
+        // Day 시간대에 작업이 있는 경우에만 표시
+        if (dayMH > 0) {
+            const dayRow = document.createElement('tr');
+            dayRow.className = 'border-b hover:bg-gray-50';
+
+            const dayTotalHTP = dayMH > 0 ? dayQty / dayMH : 0;
+
+            let dayHtml = `
+                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${worker.name}</td>
+                <td class="px-3 py-2 text-center">
+                    <div class="font-semibold text-blue-700">${dayTotalHTP.toFixed(0)}</div>
+                </td>
+            `;
+
+            // Day 시간대: 09~18시
+            for (let i = 9; i <= 18; i++) {
+                const hourData = worker.hourlyData[i];
+                if (hourData.totalMH > 0) {
+                    const htp = hourData.totalQty / hourData.totalMH;
+                    dayHtml += `<td class="px-2 py-2 text-center">
+                        <div class="font-semibold text-blue-700">${htp.toFixed(0)}</div>
+                    </td>`;
+                } else {
+                    dayHtml += `<td class="px-2 py-2 text-center text-gray-300">-</td>`;
+                }
+            }
+
+            dayRow.innerHTML = dayHtml;
+            dayTbody.appendChild(dayRow);
+        }
+    });
+
+    // Night 테이블 생성
+    const nightTbody = document.getElementById('night-status-body');
+    nightTbody.innerHTML = '';
+
+    workers.forEach(worker => {
+        // Night 시간대 합계 계산
+        let nightMH = 0;
+        let nightQty = 0;
+        for (let i = 0; i <= 8; i++) {
+            nightMH += worker.hourlyData[i].totalMH;
+            nightQty += worker.hourlyData[i].totalQty;
+        }
+
+        // Night 시간대에 작업이 있는 경우에만 표시
+        if (nightMH > 0) {
+            const nightRow = document.createElement('tr');
+            nightRow.className = 'border-b hover:bg-gray-50';
+
+            const nightTotalHTP = nightMH > 0 ? nightQty / nightMH : 0;
+
+            let nightHtml = `
+                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${worker.name}</td>
+                <td class="px-3 py-2 text-center">
+                    <div class="font-semibold text-indigo-700">${nightTotalHTP.toFixed(0)}</div>
+                </td>
+            `;
+
+            // Night 시간대: 00(24)~08시
+            for (let i = 0; i <= 8; i++) {
+                const hourData = worker.hourlyData[i];
+                if (hourData.totalMH > 0) {
+                    const htp = hourData.totalQty / hourData.totalMH;
+                    nightHtml += `<td class="px-2 py-2 text-center">
+                        <div class="font-semibold text-indigo-700">${htp.toFixed(0)}</div>
+                    </td>`;
+                } else {
+                    nightHtml += `<td class="px-2 py-2 text-center text-gray-300">-</td>`;
+                }
+            }
+
+            nightRow.innerHTML = nightHtml;
+            nightTbody.appendChild(nightRow);
+        }
     });
 }
 
-// HTP 시간 차이 계산 (MH = (HTP End - HTP Start) * 24)
+// HTP 시간 차이 계산 (초 단위로 정확하게 계산)
 function calculateMH(htpStart, htpEnd) {
-    const start = parseTime(htpStart);
-    const end = parseTime(htpEnd);
+    const startSeconds = parseTimeToSeconds(htpStart);
+    const endSeconds = parseTimeToSeconds(htpEnd);
 
-    let diffHours = end - start;
+    let diffSeconds = endSeconds - startSeconds;
 
     // 자정을 넘어가는 경우 처리
-    if (diffHours < 0) {
-        diffHours += 24;
+    if (diffSeconds < 0) {
+        diffSeconds += 24 * 3600; // 24시간을 초로
     }
 
-    return diffHours;
+    // 초를 시간으로 변환
+    return diffSeconds / 3600;
+}
+
+// 시간을 초로 변환
+function parseTimeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+
+    // 숫자인 경우 (Excel 시간 형식: 0.5 = 12시간)
+    if (typeof timeStr === 'number') {
+        return timeStr * 24 * 3600; // 시간을 초로
+    }
+
+    // 문자열인 경우 (HH:MM:SS)
+    const str = String(timeStr);
+    const parts = str.split(':');
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    const seconds = parseInt(parts[2]) || 0;
+
+    return hours * 3600 + minutes * 60 + seconds;
 }
 
 // 시간 문자열을 시간(소수)로 변환
 function parseTime(timeStr) {
     if (!timeStr) return 0;
-    const parts = timeStr.split(':');
+
+    // 숫자인 경우 (Excel 시간 형식: 0.5 = 12시간)
+    if (typeof timeStr === 'number') {
+        return timeStr * 24;
+    }
+
+    // 문자열인 경우
+    const str = String(timeStr);
+    const parts = str.split(':');
     const hours = parseInt(parts[0]) || 0;
     const minutes = parseInt(parts[1]) || 0;
     const seconds = parseInt(parts[2]) || 0;
@@ -263,29 +362,45 @@ function getHourRange(htpStart, htpEnd) {
     };
 }
 
-// 시간대별로 MH와 수량 분배
-function distributeToHours(hourlyData, htpStart, htpEnd, totalMH, totalQty) {
-    const start = parseTime(htpStart);
-    const end = parseTime(htpEnd);
+// 시간대별로 작업시간과 수량 분배
+function distributeToHourRanges(hourlyData, htpStart, htpEnd, totalMH, totalQty) {
+    const startSeconds = parseTimeToSeconds(htpStart);
+    const endSeconds = parseTimeToSeconds(htpEnd);
 
-    let currentTime = start;
-    const endTime = end > start ? end : end + 24;
+    let currentSeconds = startSeconds;
+    let remainingSeconds = endSeconds - startSeconds;
 
-    while (currentTime < endTime) {
-        const currentHour = Math.floor(currentTime) % 24;
-        const nextHour = currentTime + 1;
-        const segmentEnd = Math.min(Math.ceil(currentTime), endTime);
+    // 자정을 넘어가는 경우 처리
+    if (remainingSeconds < 0) {
+        remainingSeconds += 24 * 3600;
+    }
 
-        const segmentDuration = segmentEnd - currentTime;
-        const ratio = segmentDuration / totalMH;
+    while (remainingSeconds > 0) {
+        const currentHour = Math.floor(currentSeconds / 3600) % 24;
 
-        // 00~08시 범위만 처리
-        if (currentHour >= 0 && currentHour <= 8) {
-            hourlyData[currentHour].mh += segmentDuration;
-            hourlyData[currentHour].qty += totalQty * ratio;
+        // 현재 시간대의 끝 (다음 정시)
+        const nextHourSeconds = (Math.floor(currentSeconds / 3600) + 1) * 3600;
+
+        // 현재 시간대에서 작업한 시간 (초)
+        const segmentSeconds = Math.min(nextHourSeconds - currentSeconds, remainingSeconds);
+
+        // 비율 계산
+        const ratio = segmentSeconds / (endSeconds - startSeconds > 0 ? endSeconds - startSeconds : endSeconds - startSeconds + 24 * 3600);
+
+        // 해당 시간대에 MH와 수량 누적 (전체 시간대)
+        if (currentHour >= 0 && currentHour <= 23) {
+            hourlyData[currentHour].totalMH += segmentSeconds / 3600; // 초를 시간으로 변환
+            hourlyData[currentHour].totalQty += totalQty * ratio;
         }
 
-        currentTime = segmentEnd;
+        // 다음 구간으로 이동
+        currentSeconds = nextHourSeconds;
+        remainingSeconds -= segmentSeconds;
+
+        // 무한루프 방지
+        if (currentSeconds >= 24 * 3600) {
+            currentSeconds = currentSeconds % (24 * 3600);
+        }
     }
 }
 
@@ -325,11 +440,6 @@ async function displayRawData() {
     });
 }
 
-// 작업자 검색
-workerSearch.addEventListener('input', (e) => {
-    displayWorkerStatus(e.target.value);
-});
-
 // 데이터 초기화
 clearDataBtn.addEventListener('click', async () => {
     if (confirm('모든 데이터를 삭제하시겠습니까?')) {
@@ -342,21 +452,85 @@ clearDataBtn.addEventListener('click', async () => {
         clearDataBtn.classList.add('hidden');
 
         currentData = [];
-        currentWorkDate = null;
 
         showToast('모든 데이터가 삭제되었습니다.');
     }
 });
+
+// LMS 데이터 파싱
+parseLmsBtn.addEventListener('click', () => {
+    const inputText = lmsInput.value.trim();
+    if (!inputText) {
+        showToast('데이터를 입력해주세요.');
+        return;
+    }
+
+    try {
+        const lines = inputText.split('\n');
+        const lmsData = [];
+
+        // 첫 줄은 헤더로 간주하고 건너뜀
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            // 탭 또는 쉼표로 구분
+            const parts = line.split(/\t|,/).map(p => p.trim());
+
+            // 최소 9개 컬럼이 있어야 함
+            // 출근일, 사용자 아이디, 전화번호, 작업자이름, Wave, 교대, 시프트 시작시간, 시프트 종료 시간, 실제 출근시간
+            if (parts.length >= 6) {
+                lmsData.push({
+                    shift: parts[5],        // 교대
+                    workerName: parts[3],   // 작업자이름
+                    employeeId: parts[1]    // 사용자 아이디
+                });
+            }
+        }
+
+        if (lmsData.length === 0) {
+            showToast('파싱할 데이터가 없습니다.');
+            return;
+        }
+
+        // 테이블에 표시
+        displayLmsData(lmsData);
+        lmsResult.classList.remove('hidden');
+        showToast(`${lmsData.length}개의 데이터를 파싱했습니다.`);
+    } catch (error) {
+        console.error('LMS 파싱 오류:', error);
+        showToast('데이터 파싱 중 오류가 발생했습니다.');
+    }
+});
+
+// LMS 입력 초기화
+clearLmsBtn.addEventListener('click', () => {
+    lmsInput.value = '';
+    lmsTableBody.innerHTML = '';
+    lmsResult.classList.add('hidden');
+});
+
+// LMS 데이터 테이블 표시
+function displayLmsData(lmsData) {
+    lmsTableBody.innerHTML = '';
+
+    lmsData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+        row.innerHTML = `
+            <td class="px-4 py-2 border-b">${item.shift}</td>
+            <td class="px-4 py-2 border-b">${item.workerName}</td>
+            <td class="px-4 py-2 border-b">${item.employeeId}</td>
+        `;
+        lmsTableBody.appendChild(row);
+    });
+}
 
 // 페이지 로드 시 저장된 데이터 표시
 window.addEventListener('load', async () => {
     const data = await db.data.toArray();
     if (data.length > 0) {
         currentData = data;
-        const metadata = await db.metadata.get('workDate');
-        if (metadata) {
-            currentWorkDate = metadata.value;
-        }
         showUI();
     }
 });
