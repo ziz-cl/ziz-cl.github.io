@@ -200,9 +200,16 @@ async function displayWorkerStatus() {
 
         // employeeId가 8자리가 아니면 다시 추출 (기존 데이터 호환성)
         if (employeeId && employeeId.length !== 8) {
-            const match = String(employeeId).match(/\d{8}/);
+            // 010 다음의 8자리 추출 시도
+            const match = String(employeeId).match(/010(\d{8})/);
             if (match) {
-                employeeId = match[0];
+                employeeId = match[1];
+            } else {
+                // 그냥 8자리 숫자 추출
+                const fallbackMatch = String(employeeId).match(/\d{8}/);
+                if (fallbackMatch) {
+                    employeeId = fallbackMatch[0];
+                }
             }
         }
 
@@ -575,10 +582,17 @@ async function parseLmsData(inputText) {
                 const workerName = parts[3];
                 const shift = parts[5];
 
-                // employeeId에서 8자리 숫자만 추출
-                const match = String(employeeId).match(/\d{8}/);
+                // employeeId에서 010 다음의 8자리 숫자 추출
+                // 01012345678 -> 12345678
+                const match = String(employeeId).match(/010(\d{8})/);
                 if (match) {
-                    employeeId = match[0];
+                    employeeId = match[1]; // 첫 번째 캡처 그룹 (010 제외한 8자리)
+                } else {
+                    // 010으로 시작하지 않으면 그냥 8자리 숫자 추출
+                    const fallbackMatch = String(employeeId).match(/\d{8}/);
+                    if (fallbackMatch) {
+                        employeeId = fallbackMatch[0];
+                    }
                 }
 
                 // 필수 데이터가 모두 있는 경우만 추가
@@ -651,9 +665,16 @@ function displayLmsData(lmsData) {
         // employeeId가 8자리가 아니면 다시 추출 (기존 데이터 호환성)
         let employeeId = item.employeeId;
         if (employeeId && employeeId.length !== 8) {
-            const match = String(employeeId).match(/\d{8}/);
+            // 010 다음의 8자리 추출 시도
+            const match = String(employeeId).match(/010(\d{8})/);
             if (match) {
-                employeeId = match[0];
+                employeeId = match[1];
+            } else {
+                // 그냥 8자리 숫자 추출
+                const fallbackMatch = String(employeeId).match(/\d{8}/);
+                if (fallbackMatch) {
+                    employeeId = fallbackMatch[0];
+                }
             }
         }
 
