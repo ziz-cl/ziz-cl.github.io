@@ -18,6 +18,7 @@ const clearDataBtn = document.getElementById('clear-data-btn');
 const mainTabsSection = document.getElementById('main-tabs-section');
 const mainTabs = document.getElementById('main-tabs');
 const workerStatusTab = document.getElementById('worker-status-tab');
+const dailyReportTab = document.getElementById('daily-report-tab');
 const lmsTab = document.getElementById('lms-tab');
 const hlLmsTab = document.getElementById('hl-lms-tab');
 const rawDataTab = document.getElementById('raw-data-tab');
@@ -196,6 +197,7 @@ async function switchTab(tabName) {
 
     // 탭 컨텐츠 표시
     workerStatusTab.classList.add('hidden');
+    dailyReportTab.classList.add('hidden');
     lmsTab.classList.add('hidden');
     hlLmsTab.classList.add('hidden');
     rawDataTab.classList.add('hidden');
@@ -203,6 +205,9 @@ async function switchTab(tabName) {
     if (tabName === 'worker-status') {
         workerStatusTab.classList.remove('hidden');
         displayWorkerStatus();
+    } else if (tabName === 'daily-report') {
+        dailyReportTab.classList.remove('hidden');
+        displayDailyReport();
     } else if (tabName === 'lms') {
         lmsTab.classList.remove('hidden');
         // 저장된 LMS 데이터가 있으면 표시
