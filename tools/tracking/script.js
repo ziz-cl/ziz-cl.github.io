@@ -187,10 +187,21 @@ async function displayWorkerStatus() {
         // 데이터가 없으면 빈 테이블 표시
         const dayTbody = document.getElementById('day-status-body');
         const nightTbody = document.getElementById('night-status-body');
-        if (dayTbody) dayTbody.innerHTML = '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
-        if (nightTbody) nightTbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
+        if (dayTbody) dayTbody.innerHTML = '<tr><td colspan="13" class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
+        if (nightTbody) nightTbody.innerHTML = '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
         return;
     }
+
+    // LMS 데이터 로드 (이름 매칭용)
+    const lmsData = await db.lmsData.toArray();
+    const lmsMap = {};
+    lmsData.forEach(item => {
+        // 사용자 아이디에서 010 제외하고 8자리 숫자 추출
+        const match = String(item.employeeId).match(/\d{8}/);
+        if (match) {
+            lmsMap[match[0]] = item.workerName;
+        }
+    });
 
     // 작업자별 데이터 집계
     const workerStats = {};
@@ -259,8 +270,12 @@ async function displayWorkerStatus() {
 
             const dayTotalHTP = dayMH > 0 ? dayQty / dayMH : 0;
 
+            // LMS에서 이름 찾기
+            const workerName = lmsMap[worker.name] || '-';
+
             let dayHtml = `
-                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${worker.name}</td>
+                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
+                <td class="px-3 py-2 font-medium">${worker.name}</td>
                 <td class="px-3 py-2 text-center">
                     <div class="font-semibold text-blue-700">${dayTotalHTP.toFixed(0)}</div>
                 </td>
@@ -304,8 +319,12 @@ async function displayWorkerStatus() {
 
             const nightTotalHTP = nightMH > 0 ? nightQty / nightMH : 0;
 
+            // LMS에서 이름 찾기
+            const workerName = lmsMap[worker.name] || '-';
+
             let nightHtml = `
-                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${worker.name}</td>
+                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
+                <td class="px-3 py-2 font-medium">${worker.name}</td>
                 <td class="px-3 py-2 text-center">
                     <div class="font-semibold text-indigo-700">${nightTotalHTP.toFixed(0)}</div>
                 </td>
