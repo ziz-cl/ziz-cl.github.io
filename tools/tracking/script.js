@@ -466,38 +466,50 @@ parseLmsBtn.addEventListener('click', () => {
     }
 
     try {
+        console.log('=== 원본 데이터 ===');
+        console.log(inputText);
+        console.log('=================');
+
         // 줄바꿈으로 분리 (\r\n, \n, \r 모두 처리)
-        const lines = inputText.split(/\r?\n/);
+        const lines = inputText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
         const lmsData = [];
 
-        console.log('전체 줄 수:', lines.length);
+        console.log('전체 줄 수 (빈 줄 제외):', lines.length);
 
         // 모든 줄 처리 (첫 줄이 헤더인지 확인)
         let startIndex = 0;
-        if (lines.length > 0 && lines[0].includes('출근일')) {
+        if (lines.length > 0 && (lines[0].includes('출근일') || lines[0].includes('사용자'))) {
             startIndex = 1; // 헤더가 있으면 건너뜀
+            console.log('헤더 발견, 건너뜀:', lines[0]);
         }
 
         for (let i = startIndex; i < lines.length; i++) {
-            const line = lines[i].trim();
+            const line = lines[i];
 
-            // 빈 줄은 건너뜀
-            if (!line) {
-                console.log(`줄 ${i}: 빈 줄 - 건너뜀`);
-                continue;
+            // 탭으로 구분 시도 (엑셀/HTML 테이블 복사 시 기본)
+            let parts = line.split('\t');
+
+            // 탭이 없으면 여러 공백으로 구분 시도
+            if (parts.length === 1) {
+                parts = line.split(/\s{2,}/);
             }
 
-            // 탭으로 구분 (엑셀 복사 시 기본)
-            const parts = line.split('\t');
+            // 그래도 안 되면 쉼표로 구분 시도
+            if (parts.length === 1) {
+                parts = line.split(',');
+            }
+
+            // trim 처리
+            parts = parts.map(p => p.trim()).filter(p => p.length > 0);
 
             console.log(`줄 ${i}: 컬럼 수 ${parts.length}`, parts);
 
             // 출근일, 사용자 아이디, 전화번호, 작업자이름, Wave, 교대, 시프트 시작시간, 시프트 종료 시간, 실제 출근시간
             // 최소 6개 컬럼이 있어야 함 (교대까지)
             if (parts.length >= 6) {
-                const employeeId = parts[1].trim();
-                const workerName = parts[3].trim();
-                const shift = parts[5].trim();
+                const employeeId = parts[1];
+                const workerName = parts[3];
+                const shift = parts[5];
 
                 // 필수 데이터가 모두 있는 경우만 추가
                 if (employeeId && workerName && shift) {
@@ -506,19 +518,19 @@ parseLmsBtn.addEventListener('click', () => {
                         workerName: workerName,
                         employeeId: employeeId
                     });
-                    console.log(`줄 ${i}: 추가됨 - ${employeeId}, ${workerName}, ${shift}`);
+                    console.log(`✓ 줄 ${i}: 추가됨 - ${employeeId}, ${workerName}, ${shift}`);
                 } else {
-                    console.log(`줄 ${i}: 필수 데이터 누락 - 건너뜀`);
+                    console.log(`✗ 줄 ${i}: 필수 데이터 누락 - 건너뜀`);
                 }
             } else {
-                console.log(`줄 ${i}: 컬럼 수 부족 (${parts.length}개) - 건너뜀`);
+                console.log(`✗ 줄 ${i}: 컬럼 수 부족 (${parts.length}개) - 건너뜀`);
             }
         }
 
         console.log('파싱된 데이터 수:', lmsData.length);
 
         if (lmsData.length === 0) {
-            showToast('파싱할 데이터가 없습니다. 콘솔을 확인하세요.');
+            showToast('파싱할 데이터가 없습니다. 콘솔(F12)을 확인하세요.');
             return;
         }
 
