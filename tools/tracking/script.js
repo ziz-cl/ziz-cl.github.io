@@ -1854,7 +1854,17 @@ async function displayDailyReport(dayWorkers, nightWorkers) {
                 borderDash: [5, 5],
                 tension: 0.1,
                 pointRadius: 4,
-                pointHoverRadius: 6
+                pointHoverRadius: 6,
+                datalabels: {
+                    align: 'top',
+                    anchor: 'end',
+                    color: 'rgb(59, 130, 246)',
+                    font: {
+                        weight: 'bold',
+                        size: 10
+                    },
+                    formatter: (value) => Math.round(value)
+                }
             }]
         },
         options: {
@@ -1867,16 +1877,6 @@ async function displayDailyReport(dayWorkers, nightWorkers) {
                 },
                 title: {
                     display: false
-                },
-                datalabels: {
-                    display: true,
-                    align: 'top',
-                    formatter: (value) => Math.round(value),
-                    color: 'rgb(59, 130, 246)',
-                    font: {
-                        weight: 'bold',
-                        size: 11
-                    }
                 }
             },
             scales: {
@@ -1894,7 +1894,7 @@ async function displayDailyReport(dayWorkers, nightWorkers) {
                     }
                 }
             }
-        }
+        },
     });
 }
 
