@@ -945,6 +945,7 @@ function displayLmsData(lmsData) {
 async function autoSaveHlLmsData() {
     const rows = hlLmsBody.querySelectorAll('tr');
     const hlLmsData = [];
+    const seenIds = new Set(); // 중복 방지
 
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
@@ -956,9 +957,10 @@ async function autoSaveHlLmsData() {
             shiftEnd: inputs[4].value
         };
 
-        // 최소한 작업자아이디가 있어야 저장
-        if (rowData.employeeId) {
+        // 최소한 작업자아이디가 있어야 저장하고, 중복 제거
+        if (rowData.employeeId && !seenIds.has(rowData.employeeId)) {
             hlLmsData.push(rowData);
+            seenIds.add(rowData.employeeId);
         }
     });
 
@@ -968,7 +970,7 @@ async function autoSaveHlLmsData() {
         if (hlLmsData.length > 0) {
             await db.hlLmsData.bulkAdd(hlLmsData);
         }
-        console.log('HL LMS 자동 저장:', hlLmsData.length, '건');
+        console.log('HL LMS 자동 저장:', hlLmsData.length, '건 (중복 제거됨)');
     } catch (error) {
         console.error('HL LMS 자동 저장 오류:', error);
     }
@@ -1012,9 +1014,8 @@ function createHlLmsRow(data = {}) {
         await autoSaveHlLmsData();
     });
 
-    // 각 input에 자동 저장 이벤트 추가
+    // 각 input에 자동 저장 이벤트 추가 (blur만 사용하여 중복 방지)
     row.querySelectorAll('.hl-lms-input').forEach(input => {
-        input.addEventListener('change', autoSaveHlLmsData);
         input.addEventListener('blur', autoSaveHlLmsData);
     });
 
@@ -1030,7 +1031,27 @@ async function loadHlLmsData() {
         // 기본 행 1개 추가
         hlLmsBody.appendChild(createHlLmsRow());
     } else {
+        // 중복 제거 (작업자아이디 기준)
+        const seenIds = new Set();
+        const uniqueData = [];
+
         data.forEach(item => {
+            if (item.employeeId && !seenIds.has(item.employeeId)) {
+                uniqueData.push(item);
+                seenIds.add(item.employeeId);
+            }
+        });
+
+        // 중복이 발견되면 DB 정리
+        if (uniqueData.length < data.length) {
+            console.log(`중복 데이터 ${data.length - uniqueData.length}건 발견, DB 정리 중...`);
+            await db.hlLmsData.clear();
+            if (uniqueData.length > 0) {
+                await db.hlLmsData.bulkAdd(uniqueData);
+            }
+        }
+
+        uniqueData.forEach(item => {
             hlLmsBody.appendChild(createHlLmsRow(item));
         });
     }
