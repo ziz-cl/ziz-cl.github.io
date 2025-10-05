@@ -1,9 +1,10 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(7).stores({
+db.version(8).stores({
     data: '++id, employee, date',
     lmsData: '++id, employeeId, shift, date',
     hlLmsData: '++id, employeeId, sortOrder',
+    workerOrder: 'employeeId, sortOrder',
     metadata: 'key, value'
 });
 
@@ -350,7 +351,14 @@ async function displayWorkerStatus() {
     // 작업자 목록
     let workers = Object.values(workerStats);
 
-    // 작업자 정렬: LMS 작업자 먼저, HL LMS 작업자 나중에
+    // 사용자 정의 순서 로드
+    const workerOrderData = await db.workerOrder.toArray();
+    const workerOrderMap = {};
+    workerOrderData.forEach(item => {
+        workerOrderMap[item.employeeId] = item.sortOrder;
+    });
+
+    // 작업자 정렬: 사용자 정의 순서 > LMS 작업자 먼저, HL LMS 작업자 나중에
     workers.sort((a, b) => {
         const aIsHlLms = lmsMap[a.name] && lmsMap[a.name].isHlLms;
         const bIsHlLms = lmsMap[b.name] && lmsMap[b.name].isHlLms;
@@ -359,7 +367,15 @@ async function displayWorkerStatus() {
         if (aIsHlLms && !bIsHlLms) return 1;
         if (!aIsHlLms && bIsHlLms) return -1;
 
-        // 같은 그룹 내에서는 이름 순
+        // 같은 그룹 내에서 사용자 정의 순서 적용
+        const aOrder = workerOrderMap[a.name] ?? 999999;
+        const bOrder = workerOrderMap[b.name] ?? 999999;
+
+        if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+        }
+
+        // 순서가 같으면 이름 순
         return a.name.localeCompare(b.name);
     });
 
@@ -425,7 +441,9 @@ async function displayWorkerStatus() {
         // Day 시간대에 작업이 있고 시프트가 겹치는 경우에만 표시
         if (dayMH > 0 && hasValidDayShift) {
             const dayRow = document.createElement('tr');
-            dayRow.className = 'border-b hover:bg-gray-50';
+            dayRow.className = 'border-b hover:bg-gray-50 cursor-move';
+            dayRow.draggable = true;
+            dayRow.dataset.employeeId = worker.name;
 
             const dayTotalHTP = dayMH > 0 ? dayQty / dayMH : 0;
 
@@ -434,9 +452,9 @@ async function displayWorkerStatus() {
             const totalTextColor = dayTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
 
             let dayHtml = `
-                <td class="px-2 py-1 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
-                <td class="px-2 py-1 font-medium border border-gray-300">${worker.name}</td>
-                <td class="px-2 py-1 text-center border border-gray-300 ${totalBgColor}">
+                <td class="px-1 py-2 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-1 py-2 font-medium border border-gray-300">${worker.name}</td>
+                <td class="px-1 py-2 text-center border border-gray-300 ${totalBgColor}">
                     <div class="font-semibold ${totalTextColor}">${dayTotalHTP.toFixed(0)}</div>
                 </td>
             `;
@@ -452,16 +470,19 @@ async function displayWorkerStatus() {
                     const htp = hourData.totalQty / hourData.totalMH;
                     const bgColor = htp >= 470 ? 'bg-blue-100' : 'bg-red-100';
                     const textColor = htp >= 470 ? 'text-blue-800' : 'text-red-800';
-                    dayHtml += `<td class="px-2 py-2 text-center border border-gray-300 ${bgColor}">
+                    dayHtml += `<td class="px-1 py-2 text-center border border-gray-300 ${bgColor}">
                         <div class="font-semibold ${textColor}">${htp.toFixed(0)}</div>
                     </td>`;
                 } else {
-                    dayHtml += `<td class="px-2 py-2 text-center text-gray-400 border border-gray-300">-</td>`;
+                    dayHtml += `<td class="px-1 py-2 text-center text-gray-400 border border-gray-300">-</td>`;
                 }
             }
 
             dayRow.innerHTML = dayHtml;
             dayTbody.appendChild(dayRow);
+
+            // 드래그 이벤트 추가
+            setupDragEvents(dayRow, dayTbody);
         }
     });
 
@@ -566,7 +587,9 @@ async function displayWorkerStatus() {
         // Night 시간대에 작업이 있고 시프트가 겹치는 경우에만 표시
         if (nightMH > 0 && hasValidNightShift) {
             const nightRow = document.createElement('tr');
-            nightRow.className = 'border-b hover:bg-gray-50';
+            nightRow.className = 'border-b hover:bg-gray-50 cursor-move';
+            nightRow.draggable = true;
+            nightRow.dataset.employeeId = worker.name;
 
             const nightTotalHTP = nightMH > 0 ? nightQty / nightMH : 0;
 
@@ -575,9 +598,9 @@ async function displayWorkerStatus() {
             const totalTextColor = nightTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
 
             let nightHtml = `
-                <td class="px-2 py-1 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
-                <td class="px-2 py-1 font-medium text-center border border-gray-300">${worker.name}</td>
-                <td class="px-2 py-1 text-center border border-gray-300 ${totalBgColor}">
+                <td class="px-1 py-2 font-medium text-center sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-1 py-2 font-medium text-center border border-gray-300">${worker.name}</td>
+                <td class="px-1 py-2 text-center border border-gray-300 ${totalBgColor}">
                     <div class="font-semibold ${totalTextColor}">${nightTotalHTP.toFixed(0)}</div>
                 </td>
             `;
@@ -604,18 +627,83 @@ async function displayWorkerStatus() {
                     const htp = hourData.totalQty / hourData.totalMH;
                     const bgColor = htp >= 470 ? 'bg-blue-100' : 'bg-red-100';
                     const textColor = htp >= 470 ? 'text-blue-800' : 'text-red-800';
-                    nightHtml += `<td class="px-2 py-2 text-center border border-gray-300 ${bgColor}">
+                    nightHtml += `<td class="px-1 py-2 text-center border border-gray-300 ${bgColor}">
                         <div class="font-semibold ${textColor}">${htp.toFixed(0)}</div>
                     </td>`;
                 } else {
-                    nightHtml += `<td class="px-2 py-2 text-center text-gray-400 border border-gray-300">-</td>`;
+                    nightHtml += `<td class="px-1 py-2 text-center text-gray-400 border border-gray-300">-</td>`;
                 }
             }
 
             nightRow.innerHTML = nightHtml;
             nightTbody.appendChild(nightRow);
+
+            // 드래그 이벤트 추가
+            setupDragEvents(nightRow, nightTbody);
         }
     });
+}
+
+// 드래그 앤 드롭 이벤트 설정
+function setupDragEvents(row, tbody) {
+    row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.classList.add('opacity-50');
+    });
+
+    row.addEventListener('dragend', (e) => {
+        e.target.classList.remove('opacity-50');
+    });
+
+    row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const draggingRow = tbody.querySelector('.opacity-50');
+        if (draggingRow && draggingRow !== e.currentTarget) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+
+            if (e.clientY < midpoint) {
+                tbody.insertBefore(draggingRow, e.currentTarget);
+            } else {
+                tbody.insertBefore(draggingRow, e.currentTarget.nextSibling);
+            }
+        }
+    });
+
+    row.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        // 순서가 변경되었으므로 저장
+        await saveWorkerOrder(tbody);
+    });
+}
+
+// 작업자 순서 저장
+async function saveWorkerOrder(tbody) {
+    const rows = tbody.querySelectorAll('tr');
+    const orderData = [];
+
+    rows.forEach((row, index) => {
+        const employeeId = row.dataset.employeeId;
+        if (employeeId) {
+            orderData.push({
+                employeeId: employeeId,
+                sortOrder: index
+            });
+        }
+    });
+
+    try {
+        // 기존 순서 삭제 후 새로 저장
+        await db.workerOrder.clear();
+        if (orderData.length > 0) {
+            await db.workerOrder.bulkAdd(orderData);
+        }
+        console.log('작업자 순서 저장:', orderData.length, '건');
+    } catch (error) {
+        console.error('작업자 순서 저장 오류:', error);
+    }
 }
 
 // HTP 시간 차이 계산 (초 단위로 정확하게 계산)
@@ -745,7 +833,7 @@ async function displayRawData() {
     headerRow.innerHTML = '';
     headers.forEach(header => {
         const th = document.createElement('th');
-        th.className = 'px-2 py-1 text-left font-semibold';
+        th.className = 'px-1 py-2 text-left font-semibold';
         th.textContent = header;
         headerRow.appendChild(th);
     });
@@ -760,7 +848,7 @@ async function displayRawData() {
 
         headers.forEach(header => {
             const td = document.createElement('td');
-            td.className = 'px-2 py-1 text-sm';
+            td.className = 'px-1 py-2 text-sm';
             td.textContent = row[header] || '-';
             tr.appendChild(td);
         });
@@ -996,30 +1084,30 @@ function createHlLmsRow(data = {}) {
     row.className = 'hover:bg-gray-50 cursor-move';
     row.draggable = true;
     row.innerHTML = `
-        <td class="border border-gray-300 px-2 py-1">
+        <td class="border border-gray-300 px-1 py-2">
             <div class="flex items-center gap-2">
                 <span class="text-gray-400 cursor-move">⋮⋮</span>
-                <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                <input type="text" class="w-full px-1 py-2 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
                        placeholder="닉네임" value="${data.nickname || ''}" data-field="nickname">
             </div>
         </td>
-        <td class="border border-gray-300 px-2 py-1">
-            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+        <td class="border border-gray-300 px-1 py-2">
+            <input type="text" class="w-full px-1 py-2 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
                    placeholder="12345678" value="${data.employeeId || ''}" data-field="employeeId">
         </td>
-        <td class="border border-gray-300 px-2 py-1">
-            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+        <td class="border border-gray-300 px-1 py-2">
+            <input type="text" class="w-full px-1 py-2 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
                    placeholder="Day/Night" value="${data.shift || data.wave || ''}" data-field="shift">
         </td>
-        <td class="border border-gray-300 px-2 py-1">
-            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+        <td class="border border-gray-300 px-1 py-2">
+            <input type="text" class="w-full px-1 py-2 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
                    placeholder="00:00~32:00" value="${data.shiftStart || ''}" data-field="shiftStart" pattern="^([0-2]?[0-9]|3[0-2]):[0-5][0-9]$">
         </td>
-        <td class="border border-gray-300 px-2 py-1">
-            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+        <td class="border border-gray-300 px-1 py-2">
+            <input type="text" class="w-full px-1 py-2 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
                    placeholder="00:00~32:00" value="${data.shiftEnd || ''}" data-field="shiftEnd" pattern="^([0-2]?[0-9]|3[0-2]):[0-5][0-9]$">
         </td>
-        <td class="border border-gray-300 px-2 py-1 text-center">
+        <td class="border border-gray-300 px-1 py-2 text-center">
             <button class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs delete-hl-lms-row">
                 삭제
             </button>
