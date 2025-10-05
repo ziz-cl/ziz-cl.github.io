@@ -1767,15 +1767,15 @@ async function displayDailyReport() {
     const workers = {};
     let stowCount = 0;
     data.forEach(task => {
-        const employee = task['Employee'];
-        const taskType = task['Task Type'];
+        const employee = task['Employee'] || '이름 없음';
+        const processTask = task['Process(Task)'];
         const taskDate = task.date || 'undefined';
 
-        if (taskType === 'STOW(STOW)') {
+        if (processTask === 'STOW(STOW)') {
             stowCount++;
         }
 
-        if (taskType !== 'STOW(STOW)') return;
+        if (processTask !== 'STOW(STOW)') return;
 
         if (!workers[employee]) {
             workers[employee] = {
@@ -1786,46 +1786,23 @@ async function displayDailyReport() {
 
         if (!workers[employee].dates[taskDate]) {
             workers[employee].dates[taskDate] = {
-                hourlyData: {}
+                hourlyData: Array(33).fill(null).map(() => ({
+                    totalQty: 0,
+                    totalMH: 0
+                }))
             };
-            for (let i = 0; i < 33; i++) {
-                workers[employee].dates[taskDate].hourlyData[i] = { totalQty: 0, totalMH: 0 };
-            }
         }
 
         const htpStart = task['HTP Start'];
         const htpEnd = task['HTP End'];
         const unitQty = parseFloat(task['Unit Qty']) || 0;
-        const mh = parseFloat(task['MH']) || 0;
 
         if (!htpStart || !htpEnd) return;
 
-        const startSeconds = parseTimeToSeconds(htpStart);
-        const endSeconds = parseTimeToSeconds(htpEnd);
+        const mh = calculateMH(htpStart, htpEnd);
 
-        if (startSeconds === null || endSeconds === null) return;
-
-        const durationSeconds = endSeconds - startSeconds;
-        if (durationSeconds <= 0) return;
-
-        for (let hour = 0; hour < 33; hour++) {
-            const hourStart = hour * 3600;
-            const hourEnd = (hour + 1) * 3600;
-
-            const overlapStart = Math.max(startSeconds, hourStart);
-            const overlapEnd = Math.min(endSeconds, hourEnd);
-
-            if (overlapStart < overlapEnd) {
-                const overlapSeconds = overlapEnd - overlapStart;
-                const proportion = overlapSeconds / durationSeconds;
-
-                const qty = unitQty * proportion;
-                const hourMH = mh * proportion;
-
-                workers[employee].dates[taskDate].hourlyData[hour].totalQty += qty;
-                workers[employee].dates[taskDate].hourlyData[hour].totalMH += hourMH;
-            }
-        }
+        // 시간대별로 MH와 수량 분배
+        distributeToHourRangesExtended(workers[employee].dates[taskDate].hourlyData, htpStart, htpEnd, mh, unitQty);
     });
 
     console.log('Daily Report - STOW(STOW) 작업 수:', stowCount);
