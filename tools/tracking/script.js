@@ -459,37 +459,66 @@ clearDataBtn.addEventListener('click', async () => {
 
 // LMS 데이터 파싱
 parseLmsBtn.addEventListener('click', () => {
-    const inputText = lmsInput.value.trim();
-    if (!inputText) {
+    const inputText = lmsInput.value;
+    if (!inputText.trim()) {
         showToast('데이터를 입력해주세요.');
         return;
     }
 
     try {
-        const lines = inputText.split('\n');
+        // 줄바꿈으로 분리 (\r\n, \n, \r 모두 처리)
+        const lines = inputText.split(/\r?\n/);
         const lmsData = [];
 
-        // 첫 줄은 헤더로 간주하고 건너뜀
-        for (let i = 1; i < lines.length; i++) {
+        console.log('전체 줄 수:', lines.length);
+
+        // 모든 줄 처리 (첫 줄이 헤더인지 확인)
+        let startIndex = 0;
+        if (lines.length > 0 && lines[0].includes('출근일')) {
+            startIndex = 1; // 헤더가 있으면 건너뜀
+        }
+
+        for (let i = startIndex; i < lines.length; i++) {
             const line = lines[i].trim();
-            if (!line) continue;
 
-            // 탭 또는 쉼표로 구분
-            const parts = line.split(/\t|,/).map(p => p.trim());
+            // 빈 줄은 건너뜀
+            if (!line) {
+                console.log(`줄 ${i}: 빈 줄 - 건너뜀`);
+                continue;
+            }
 
-            // 최소 9개 컬럼이 있어야 함
+            // 탭으로 구분 (엑셀 복사 시 기본)
+            const parts = line.split('\t');
+
+            console.log(`줄 ${i}: 컬럼 수 ${parts.length}`, parts);
+
             // 출근일, 사용자 아이디, 전화번호, 작업자이름, Wave, 교대, 시프트 시작시간, 시프트 종료 시간, 실제 출근시간
+            // 최소 6개 컬럼이 있어야 함 (교대까지)
             if (parts.length >= 6) {
-                lmsData.push({
-                    shift: parts[5],        // 교대
-                    workerName: parts[3],   // 작업자이름
-                    employeeId: parts[1]    // 사용자 아이디
-                });
+                const employeeId = parts[1].trim();
+                const workerName = parts[3].trim();
+                const shift = parts[5].trim();
+
+                // 필수 데이터가 모두 있는 경우만 추가
+                if (employeeId && workerName && shift) {
+                    lmsData.push({
+                        shift: shift,
+                        workerName: workerName,
+                        employeeId: employeeId
+                    });
+                    console.log(`줄 ${i}: 추가됨 - ${employeeId}, ${workerName}, ${shift}`);
+                } else {
+                    console.log(`줄 ${i}: 필수 데이터 누락 - 건너뜀`);
+                }
+            } else {
+                console.log(`줄 ${i}: 컬럼 수 부족 (${parts.length}개) - 건너뜀`);
             }
         }
 
+        console.log('파싱된 데이터 수:', lmsData.length);
+
         if (lmsData.length === 0) {
-            showToast('파싱할 데이터가 없습니다.');
+            showToast('파싱할 데이터가 없습니다. 콘솔을 확인하세요.');
             return;
         }
 
