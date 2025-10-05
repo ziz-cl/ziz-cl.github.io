@@ -434,9 +434,9 @@ async function displayWorkerStatus() {
             const totalTextColor = dayTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
 
             let dayHtml = `
-                <td class="px-3 py-2 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
-                <td class="px-3 py-2 font-medium border border-gray-300">${worker.name}</td>
-                <td class="px-3 py-2 text-center border border-gray-300 ${totalBgColor}">
+                <td class="px-2 py-1 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-2 py-1 font-medium border border-gray-300">${worker.name}</td>
+                <td class="px-2 py-1 text-center border border-gray-300 ${totalBgColor}">
                     <div class="font-semibold ${totalTextColor}">${dayTotalHTP.toFixed(0)}</div>
                 </td>
             `;
@@ -575,9 +575,9 @@ async function displayWorkerStatus() {
             const totalTextColor = nightTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
 
             let nightHtml = `
-                <td class="px-3 py-2 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
-                <td class="px-3 py-2 font-medium border border-gray-300">${worker.name}</td>
-                <td class="px-3 py-2 text-center border border-gray-300 ${totalBgColor}">
+                <td class="px-2 py-1 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-2 py-1 font-medium text-center border border-gray-300">${worker.name}</td>
+                <td class="px-2 py-1 text-center border border-gray-300 ${totalBgColor}">
                     <div class="font-semibold ${totalTextColor}">${nightTotalHTP.toFixed(0)}</div>
                 </td>
             `;
@@ -745,7 +745,7 @@ async function displayRawData() {
     headerRow.innerHTML = '';
     headers.forEach(header => {
         const th = document.createElement('th');
-        th.className = 'px-3 py-2 text-left font-semibold';
+        th.className = 'px-2 py-1 text-left font-semibold';
         th.textContent = header;
         headerRow.appendChild(th);
     });
@@ -760,7 +760,7 @@ async function displayRawData() {
 
         headers.forEach(header => {
             const td = document.createElement('td');
-            td.className = 'px-3 py-2 text-sm';
+            td.className = 'px-2 py-1 text-sm';
             td.textContent = row[header] || '-';
             tr.appendChild(td);
         });
