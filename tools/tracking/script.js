@@ -301,9 +301,16 @@ async function displayWorkerStatus() {
             let validHours = null;
             if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
                 const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
-                const endHour = parseInt(lmsInfo.shiftEnd.split(':')[0]);
-                validHours = { start: startHour, end: endHour };
-                console.log(`${worker.name} 시프트: ${startHour}시-${endHour}시`);
+                const endTimeParts = lmsInfo.shiftEnd.split(':');
+                const endHour = parseInt(endTimeParts[0]);
+                const endMinute = parseInt(endTimeParts[1]) || 0;
+
+                // 종료 시간이 정각(00분)이면 이전 시간대까지만 포함
+                // 예: 09:00 종료 -> 08시까지, 09:30 종료 -> 09시까지
+                const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+
+                validHours = { start: startHour, end: actualEndHour };
+                console.log(`${worker.name} Day 시프트: ${startHour}시-${actualEndHour}시 (원본: ${lmsInfo.shiftStart}-${lmsInfo.shiftEnd})`);
             }
 
             let dayHtml = `
@@ -364,8 +371,16 @@ async function displayWorkerStatus() {
             let validHours = null;
             if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
                 const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
-                const endHour = parseInt(lmsInfo.shiftEnd.split(':')[0]);
-                validHours = { start: startHour, end: endHour };
+                const endTimeParts = lmsInfo.shiftEnd.split(':');
+                const endHour = parseInt(endTimeParts[0]);
+                const endMinute = parseInt(endTimeParts[1]) || 0;
+
+                // 종료 시간이 정각(00분)이면 이전 시간대까지만 포함
+                // 예: 09:00 종료 -> 08시까지, 09:30 종료 -> 09시까지
+                const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+
+                validHours = { start: startHour, end: actualEndHour };
+                console.log(`${worker.name} Night 시프트: ${startHour}시-${actualEndHour}시 (원본: ${lmsInfo.shiftStart}-${lmsInfo.shiftEnd})`);
             }
 
             let nightHtml = `
