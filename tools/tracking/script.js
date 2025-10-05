@@ -1,9 +1,9 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(6).stores({
+db.version(7).stores({
     data: '++id, employee, date',
     lmsData: '++id, employeeId, shift, date',
-    hlLmsData: '++id, employeeId',
+    hlLmsData: '++id, employeeId, sortOrder',
     metadata: 'key, value'
 });
 
@@ -349,6 +349,19 @@ async function displayWorkerStatus() {
 
     // 작업자 목록
     let workers = Object.values(workerStats);
+
+    // 작업자 정렬: LMS 작업자 먼저, HL LMS 작업자 나중에
+    workers.sort((a, b) => {
+        const aIsHlLms = lmsMap[a.name] && lmsMap[a.name].isHlLms;
+        const bIsHlLms = lmsMap[b.name] && lmsMap[b.name].isHlLms;
+
+        // HL LMS 작업자를 아래로
+        if (aIsHlLms && !bIsHlLms) return 1;
+        if (!aIsHlLms && bIsHlLms) return -1;
+
+        // 같은 그룹 내에서는 이름 순
+        return a.name.localeCompare(b.name);
+    });
 
     // Day 테이블 생성
     const dayTbody = document.getElementById('day-status-body');
@@ -947,14 +960,15 @@ async function autoSaveHlLmsData() {
     const hlLmsData = [];
     const seenIds = new Set(); // 중복 방지
 
-    rows.forEach(row => {
+    rows.forEach((row, index) => {
         const inputs = row.querySelectorAll('input');
         const rowData = {
             nickname: inputs[0].value.trim(),
             employeeId: inputs[1].value.trim(),
             shift: inputs[2].value.trim(),
             shiftStart: inputs[3].value,
-            shiftEnd: inputs[4].value
+            shiftEnd: inputs[4].value,
+            sortOrder: index // 순서 저장
         };
 
         // 최소한 작업자아이디가 있어야 저장하고, 중복 제거
@@ -979,11 +993,15 @@ async function autoSaveHlLmsData() {
 // HL LMS 관련 함수들
 function createHlLmsRow(data = {}) {
     const row = document.createElement('tr');
-    row.className = 'hover:bg-gray-50';
+    row.className = 'hover:bg-gray-50 cursor-move';
+    row.draggable = true;
     row.innerHTML = `
         <td class="border border-gray-300 px-2 py-1">
-            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
-                   placeholder="닉네임" value="${data.nickname || ''}" data-field="nickname">
+            <div class="flex items-center gap-2">
+                <span class="text-gray-400 cursor-move">⋮⋮</span>
+                <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                       placeholder="닉네임" value="${data.nickname || ''}" data-field="nickname">
+            </div>
         </td>
         <td class="border border-gray-300 px-2 py-1">
             <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
@@ -1019,6 +1037,40 @@ function createHlLmsRow(data = {}) {
         input.addEventListener('blur', autoSaveHlLmsData);
     });
 
+    // 드래그 앤 드롭 이벤트
+    row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.classList.add('opacity-50');
+        e.dataTransfer.setData('text/html', e.target.innerHTML);
+    });
+
+    row.addEventListener('dragend', (e) => {
+        e.target.classList.remove('opacity-50');
+    });
+
+    row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        const draggingRow = document.querySelector('.opacity-50');
+        if (draggingRow && draggingRow !== e.currentTarget) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+
+            if (e.clientY < midpoint) {
+                e.currentTarget.parentNode.insertBefore(draggingRow, e.currentTarget);
+            } else {
+                e.currentTarget.parentNode.insertBefore(draggingRow, e.currentTarget.nextSibling);
+            }
+        }
+    });
+
+    row.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        // 순서가 변경되었으므로 자동 저장
+        await autoSaveHlLmsData();
+    });
+
     return row;
 }
 
@@ -1050,6 +1102,9 @@ async function loadHlLmsData() {
                 await db.hlLmsData.bulkAdd(uniqueData);
             }
         }
+
+        // sortOrder 순으로 정렬 (없으면 0으로 간주)
+        uniqueData.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
         uniqueData.forEach(item => {
             hlLmsBody.appendChild(createHlLmsRow(item));
