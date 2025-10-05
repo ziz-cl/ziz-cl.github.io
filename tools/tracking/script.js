@@ -1711,12 +1711,17 @@ let dailyReportChart = null;
 
 async function displayDailyReport() {
     const data = await db.data.toArray();
+    console.log('Daily Report - 전체 데이터 개수:', data.length);
     if (data.length === 0) return;
+
+    console.log('Daily Report - 첫 데이터 샘플:', data[0]);
 
     // 날짜 정보
     const dates = [...new Set(data.map(task => task.date).filter(d => d))].sort();
     const latestDate = dates.length > 0 ? dates[dates.length - 1] : 'undefined';
     const previousDate = dates.length > 1 ? dates[dates.length - 2] : 'undefined';
+
+    console.log('Daily Report - 사용 가능한 날짜:', dates);
 
     // LMS 데이터 로드
     const lmsData = await db.lmsData.toArray();
@@ -1760,10 +1765,15 @@ async function displayDailyReport() {
 
     // 작업자별 데이터 수집 (HTP 테이블과 동일한 로직)
     const workers = {};
+    let stowCount = 0;
     data.forEach(task => {
         const employee = task['Employee'];
         const taskType = task['Task Type'];
         const taskDate = task.date || 'undefined';
+
+        if (taskType === 'STOW(STOW)') {
+            stowCount++;
+        }
 
         if (taskType !== 'STOW(STOW)') return;
 
@@ -1817,6 +1827,9 @@ async function displayDailyReport() {
             }
         }
     });
+
+    console.log('Daily Report - STOW(STOW) 작업 수:', stowCount);
+    console.log('Daily Report - workers 객체:', workers);
 
     const workerList = Object.values(workers);
 
