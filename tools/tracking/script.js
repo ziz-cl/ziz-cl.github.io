@@ -1718,19 +1718,77 @@ async function displayDailyReport() {
     const latestDate = dates.length > 0 ? dates[dates.length - 1] : 'undefined';
     const previousDate = dates.length > 1 ? dates[dates.length - 2] : 'undefined';
 
-    // 09~08시 (24시간) 작업수 집계
-    const hourlyActual = Array(24).fill(0);
+    // LMS 데이터 로드
+    const lmsData = await db.lmsData.toArray();
+    const lmsMap = {};
+    lmsData.forEach(item => {
+        let employeeId = item.employeeId;
+        if (employeeId && employeeId.length !== 8) {
+            const match = String(employeeId).match(/010(\d{8})/);
+            if (match) {
+                employeeId = match[1];
+            } else {
+                const fallbackMatch = String(employeeId).match(/\d{8}/);
+                if (fallbackMatch) {
+                    employeeId = fallbackMatch[0];
+                }
+            }
+        }
+        if (employeeId) {
+            lmsMap[employeeId] = {
+                workerName: item.workerName,
+                shift: item.shift,
+                shiftStart: item.shiftStart,
+                shiftEnd: item.shiftEnd
+            };
+        }
+    });
 
+    // HL LMS 데이터 로드
+    const hlLmsData = await db.hlLmsData.toArray();
+    hlLmsData.forEach(item => {
+        if (item.employeeId) {
+            lmsMap[item.employeeId] = {
+                workerName: item.nickname || item.employeeId,
+                shift: item.shift,
+                shiftStart: item.shiftStart,
+                shiftEnd: item.shiftEnd,
+                isHlLms: true
+            };
+        }
+    });
+
+    // 작업자별 데이터 수집 (HTP 테이블과 동일한 로직)
+    const workers = {};
     data.forEach(task => {
+        const employee = task['Employee'];
         const taskType = task['Task Type'];
+        const taskDate = task.date || 'undefined';
+
         if (taskType !== 'STOW(STOW)') return;
+
+        if (!workers[employee]) {
+            workers[employee] = {
+                name: employee,
+                dates: {}
+            };
+        }
+
+        if (!workers[employee].dates[taskDate]) {
+            workers[employee].dates[taskDate] = {
+                hourlyData: {}
+            };
+            for (let i = 0; i < 33; i++) {
+                workers[employee].dates[taskDate].hourlyData[i] = { totalQty: 0, totalMH: 0 };
+            }
+        }
 
         const htpStart = task['HTP Start'];
         const htpEnd = task['HTP End'];
         const unitQty = parseFloat(task['Unit Qty']) || 0;
-        const taskDate = task.date || 'undefined';
+        const mh = parseFloat(task['MH']) || 0;
 
-        if (!htpStart || !htpEnd || unitQty <= 0) return;
+        if (!htpStart || !htpEnd) return;
 
         const startSeconds = parseTimeToSeconds(htpStart);
         const endSeconds = parseTimeToSeconds(htpEnd);
@@ -1740,8 +1798,7 @@ async function displayDailyReport() {
         const durationSeconds = endSeconds - startSeconds;
         if (durationSeconds <= 0) return;
 
-        // 09~32시 범위로 계산 (24시간 연속)
-        for (let hour = 9; hour < 33; hour++) {
+        for (let hour = 0; hour < 33; hour++) {
             const hourStart = hour * 3600;
             const hourEnd = (hour + 1) * 3600;
 
@@ -1751,23 +1808,67 @@ async function displayDailyReport() {
             if (overlapStart < overlapEnd) {
                 const overlapSeconds = overlapEnd - overlapStart;
                 const proportion = overlapSeconds / durationSeconds;
+
                 const qty = unitQty * proportion;
+                const hourMH = mh * proportion;
 
-                // 09~32시를 09~08시로 매핑
-                const actualHour = hour % 24;
-                const hourIndex = actualHour >= 9 ? actualHour - 9 : actualHour + 15;
-
-                // 최신 날짜 데이터만 집계
-                if (hour < 24 && taskDate === latestDate) {
-                    hourlyActual[hourIndex] += qty;
-                }
-                // 전일 24~32시 데이터는 00~08시로
-                if (hour >= 24 && hour < 33 && taskDate === previousDate) {
-                    hourlyActual[hourIndex] += qty;
-                }
+                workers[employee].dates[taskDate].hourlyData[hour].totalQty += qty;
+                workers[employee].dates[taskDate].hourlyData[hour].totalMH += hourMH;
             }
         }
     });
+
+    const workerList = Object.values(workers);
+
+    // 09~08시 (24시간) 작업수 집계
+    const hourlyActual = Array(24).fill(0);
+
+    // Day 시간대 (09~18시) - 최신 날짜
+    for (let hour = 9; hour <= 18; hour++) {
+        workerList.forEach(worker => {
+            const dayData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+            if (dayData && dayData.hourlyData[hour]) {
+                const hourIndex = hour - 9; // 09시 -> index 0
+                hourlyActual[hourIndex] += dayData.hourlyData[hour].totalQty;
+            }
+        });
+    }
+
+    // Night 시간대 (19~23시) - 최신 날짜
+    for (let hour = 19; hour <= 23; hour++) {
+        workerList.forEach(worker => {
+            const nightData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+            if (nightData && nightData.hourlyData[hour]) {
+                const hourIndex = hour - 9; // 19시 -> index 10
+                hourlyActual[hourIndex] += nightData.hourlyData[hour].totalQty;
+            }
+        });
+    }
+
+    // Night 시간대 (00~08시)
+    for (let hour = 0; hour <= 8; hour++) {
+        workerList.forEach(worker => {
+            const lmsInfo = lmsMap[worker.name];
+            const isHlLms = lmsInfo && lmsInfo.isHlLms;
+
+            let nightData = null;
+            if (isHlLms) {
+                // HL LMS: 전일 24~32시 사용
+                nightData = previousDate && worker.dates[previousDate] ? worker.dates[previousDate] : null;
+                if (nightData && nightData.hourlyData[24 + hour]) {
+                    const hourIndex = 15 + hour; // 00시 -> index 15
+                    hourlyActual[hourIndex] += nightData.hourlyData[24 + hour].totalQty;
+                }
+            } else {
+                // LMS: 최신 날짜 00~08시 사용
+                nightData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+                if (nightData && nightData.hourlyData[hour]) {
+                    const hourIndex = 15 + hour; // 00시 -> index 15
+                    hourlyActual[hourIndex] += nightData.hourlyData[hour].totalQty;
+                }
+            }
+        });
+    }
 
     // 차트 데이터 준비
     const labels = ['09시', '10시', '11시', '12시', '13시', '14시', '15시', '16시', '17시', '18시', '19시', '20시', '21시', '22시', '23시', '00시', '01시', '02시', '03시', '04시', '05시', '06시', '07시', '08시'];
