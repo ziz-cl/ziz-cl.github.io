@@ -196,12 +196,13 @@ async function displayWorkerStatus() {
     const lmsData = await db.lmsData.toArray();
     const lmsMap = {};
     lmsData.forEach(item => {
-        // 사용자 아이디에서 010 제외하고 8자리 숫자 추출
-        const match = String(item.employeeId).match(/\d{8}/);
-        if (match) {
-            lmsMap[match[0]] = item.workerName;
+        // employeeId는 이미 8자리로 정제되어 저장됨
+        if (item.employeeId) {
+            lmsMap[item.employeeId] = item.workerName;
         }
     });
+
+    console.log('LMS 매핑:', lmsMap);
 
     // 작업자별 데이터 집계
     const workerStats = {};
@@ -560,9 +561,15 @@ async function parseLmsData(inputText) {
             // 출근일, 사용자 아이디, 전화번호, 작업자이름, Wave, 교대, 시프트 시작시간, 시프트 종료 시간, 실제 출근시간
             // 최소 6개 컬럼이 있어야 함 (교대까지)
             if (parts.length >= 6) {
-                const employeeId = parts[1];
+                let employeeId = parts[1];
                 const workerName = parts[3];
                 const shift = parts[5];
+
+                // employeeId에서 8자리 숫자만 추출
+                const match = String(employeeId).match(/\d{8}/);
+                if (match) {
+                    employeeId = match[0];
+                }
 
                 // 필수 데이터가 모두 있는 경우만 추가
                 if (employeeId && workerName && shift) {
