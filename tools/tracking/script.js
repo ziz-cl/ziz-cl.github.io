@@ -224,15 +224,18 @@ async function displayWorkerStatus() {
     const dates = [...new Set(data.map(task => task.date).filter(d => d))].sort();
     console.log('사용 가능한 날짜들:', dates);
 
-    if (dates.length === 0) {
-        console.log('날짜 정보가 없습니다. 전체 데이터를 사용합니다.');
-    }
-
     // 최신 날짜 (Day 시프트용)
-    const latestDate = dates.length > 0 ? dates[dates.length - 1] : null;
+    let latestDate = dates.length > 0 ? dates[dates.length - 1] : null;
 
     // 전일 날짜 (HL LMS Night 시프트용)
-    const previousDate = dates.length > 1 ? dates[dates.length - 2] : null;
+    let previousDate = dates.length > 1 ? dates[dates.length - 2] : null;
+
+    // 날짜 정보가 없으면 'undefined' 사용
+    if (!latestDate) {
+        console.log('날짜 정보가 없습니다. 전체 데이터를 사용합니다.');
+        latestDate = 'undefined';
+        previousDate = 'undefined';
+    }
 
     console.log('최신 날짜 (Day/LMS Night):', latestDate);
     console.log('전일 날짜 (HL LMS Night):', previousDate);
@@ -298,7 +301,7 @@ async function displayWorkerStatus() {
 
     data.forEach(task => {
         const employee = task['Employee'] || '이름 없음';
-        const taskDate = task.date;
+        const taskDate = task.date || 'undefined'; // 날짜가 없으면 'undefined' 키 사용
 
         if (!workerStats[employee]) {
             workerStats[employee] = {
@@ -354,8 +357,11 @@ async function displayWorkerStatus() {
         const workerName = lmsInfo ? lmsInfo.workerName : '-';
 
         // Day 시프트는 최신 날짜 데이터 사용
-        const dayData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
-        if (!dayData) return; // 최신 날짜 데이터가 없으면 건너뜀
+        const dayData = worker.dates[latestDate];
+        if (!dayData) {
+            console.log(`${worker.name}: Day 데이터 없음 (날짜: ${latestDate})`);
+            return; // 최신 날짜 데이터가 없으면 건너뜀
+        }
 
         // 시프트 시간 범위 계산 (시 단위)
         let validHours = null;
@@ -455,21 +461,24 @@ async function displayWorkerStatus() {
 
         if (isHlLms) {
             // HL LMS 작업자: 전일 24~32시 데이터 사용
-            if (previousDate && worker.dates[previousDate]) {
-                nightData = worker.dates[previousDate];
+            nightData = worker.dates[previousDate];
+            if (nightData) {
                 useExtendedHours = true; // 24~32시 인덱스 사용
                 console.log(`${worker.name} (HL LMS): 전일(${previousDate}) 24~32시 데이터 사용`);
             }
         } else {
             // LMS 작업자: 최신 날짜 00~08시 데이터 사용
-            if (latestDate && worker.dates[latestDate]) {
-                nightData = worker.dates[latestDate];
+            nightData = worker.dates[latestDate];
+            if (nightData) {
                 useExtendedHours = false; // 00~08시 인덱스 사용
                 console.log(`${worker.name} (LMS): 최신(${latestDate}) 00~08시 데이터 사용`);
             }
         }
 
-        if (!nightData) return; // 데이터가 없으면 건너뜀
+        if (!nightData) {
+            console.log(`${worker.name}: Night 데이터 없음 (날짜: ${isHlLms ? previousDate : latestDate})`);
+            return; // 데이터가 없으면 건너뜀
+        }
 
         // 시프트 시간 범위 계산 (시 단위)
         let validHours = null;
