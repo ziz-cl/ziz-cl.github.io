@@ -109,12 +109,31 @@ async function parseAndSaveData(jsonData) {
             task[header] = row[index] || '';
         });
 
+        // Employee 컬럼에서 8자리 숫자만 추출
+        if (task['Employee']) {
+            const match = String(task['Employee']).match(/\d{8}/);
+            if (match) {
+                task['Employee'] = match[0];
+            }
+        }
+
         tasks.push(task);
     }
 
     currentData = tasks;
     await db.data.bulkAdd(tasks);
     await db.metadata.put({ key: 'lastUpdate', value: new Date().toLocaleString() });
+
+    // UI 업데이트
+    showUI();
+
+    // 현재 탭이 작업자 현황이면 즉시 표시
+    if (!workerStatusTab.classList.contains('hidden')) {
+        displayWorkerStatus();
+    }
+
+    // 원본 데이터 탭도 업데이트
+    displayRawData();
 }
 
 // UI 표시
@@ -454,18 +473,22 @@ async function displayRawData() {
 
 // 데이터 초기화
 clearDataBtn.addEventListener('click', async () => {
-    if (confirm('모든 데이터를 삭제하시겠습니까?')) {
+    if (confirm('4W1H 데이터를 삭제하시겠습니까?')) {
         await db.data.clear();
         await db.metadata.clear();
-
-        mainTabsSection.classList.add('hidden');
-        workerStatusTab.classList.add('hidden');
-        rawDataTab.classList.add('hidden');
+        currentData = [];
         clearDataBtn.classList.add('hidden');
 
-        currentData = [];
+        // 테이블 초기화 (빈 상태 메시지 표시)
+        displayWorkerStatus();
 
-        showToast('모든 데이터가 삭제되었습니다.');
+        // 원본 데이터 탭도 초기화
+        const rawDataHeader = document.getElementById('raw-data-header');
+        const rawDataBody = document.getElementById('raw-data-body');
+        if (rawDataHeader) rawDataHeader.innerHTML = '';
+        if (rawDataBody) rawDataBody.innerHTML = '<tr><td class="px-4 py-8 text-center text-gray-500">4W1H 파일을 업로드하세요</td></tr>';
+
+        showToast('4W1H 데이터가 삭제되었습니다.');
     }
 });
 
