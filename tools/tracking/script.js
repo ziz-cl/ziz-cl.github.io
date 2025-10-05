@@ -1,29 +1,23 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
 db.version(1).stores({
-    sheets: '++id, sheetName, data',
+    data: '++id, workDate, employee',
     metadata: 'key, value'
 });
 
 // 전역 변수
-let currentWorkbook = null;
-let currentSheetName = null;
+let currentData = [];
+let currentWorkDate = null;
 
 // DOM 요소
-const uploadArea = document.getElementById('upload-area');
+const uploadBtn = document.getElementById('upload-btn');
 const fileInput = document.getElementById('file-input');
-const tabsSection = document.getElementById('tabs-section');
-const sheetTabs = document.getElementById('sheet-tabs');
-const statsSection = document.getElementById('stats-section');
-const filterSection = document.getElementById('filter-section');
-const dataSection = document.getElementById('data-section');
-const dataGrid = document.getElementById('data-grid');
-const searchInput = document.getElementById('search-input');
 const clearDataBtn = document.getElementById('clear-data-btn');
-const detailModal = document.getElementById('detail-modal');
-const modalTitle = document.getElementById('modal-title');
-const modalBody = document.getElementById('modal-body');
-const modalClose = document.getElementById('modal-close');
+const mainTabsSection = document.getElementById('main-tabs-section');
+const mainTabs = document.getElementById('main-tabs');
+const workerStatusTab = document.getElementById('worker-status-tab');
+const rawDataTab = document.getElementById('raw-data-tab');
+const workerSearch = document.getElementById('worker-search');
 const toast = document.getElementById('toast');
 
 // 토스트 메시지 표시
@@ -35,28 +29,9 @@ function showToast(message) {
     }, 3000);
 }
 
-// 파일 업로드 영역 클릭 이벤트
-uploadArea.addEventListener('click', () => {
+// 파일 업로드 버튼
+uploadBtn.addEventListener('click', () => {
     fileInput.click();
-});
-
-// 드래그 앤 드롭 이벤트
-uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.classList.add('scale-105', 'bg-indigo-100');
-});
-
-uploadArea.addEventListener('dragleave', () => {
-    uploadArea.classList.remove('scale-105', 'bg-indigo-100');
-});
-
-uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadArea.classList.remove('scale-105', 'bg-indigo-100');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFile(files[0]);
-    }
 });
 
 // 파일 선택 이벤트
@@ -73,6 +48,14 @@ async function handleFile(file) {
         return;
     }
 
+    // 파일명에서 날짜 추출 (worker_history_YYYYMMDDHHmmss)
+    const dateMatch = file.name.match(/worker_history_(\d{14})/);
+    if (dateMatch) {
+        const dateStr = dateMatch[1];
+        currentWorkDate = `${dateStr.substr(0,4)}-${dateStr.substr(4,2)}-${dateStr.substr(6,2)} ${dateStr.substr(8,2)}:${dateStr.substr(10,2)}:${dateStr.substr(12,2)}`;
+        console.log('작업 날짜:', currentWorkDate);
+    }
+
     showToast('파일을 처리하는 중...');
 
     const reader = new FileReader();
@@ -81,20 +64,24 @@ async function handleFile(file) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
 
-            currentWorkbook = workbook;
+            // 4W1H 시트 찾기
+            let targetSheet = null;
+            if (workbook.SheetNames.includes('4W1H')) {
+                targetSheet = workbook.Sheets['4W1H'];
+            } else {
+                // 첫 번째 시트 사용
+                targetSheet = workbook.Sheets[workbook.SheetNames[0]];
+            }
 
-            // 모든 시트 데이터 저장
-            await parseAndSaveAllSheets(workbook);
+            const jsonData = XLSX.utils.sheet_to_json(targetSheet, { header: 1, defval: '' });
+
+            // 데이터 파싱 및 저장
+            await parseAndSaveData(jsonData);
 
             showToast('파일이 성공적으로 업로드되었습니다!');
 
-            // 탭 생성
-            createSheetTabs(workbook.SheetNames);
-
-            // 첫 번째 시트 표시
-            if (workbook.SheetNames.length > 0) {
-                await displaySheet(workbook.SheetNames[0]);
-            }
+            // UI 표시
+            showUI();
 
         } catch (error) {
             console.error('파일 처리 오류:', error);
@@ -104,77 +91,13 @@ async function handleFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-// 모든 시트 데이터 파싱 및 저장
-async function parseAndSaveAllSheets(workbook) {
-    // 기존 데이터 삭제
-    await db.sheets.clear();
+// 데이터 파싱 및 저장
+async function parseAndSaveData(jsonData) {
+    await db.data.clear();
 
-    for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-        // 시트 데이터 저장
-        await db.sheets.add({
-            sheetName: sheetName,
-            data: jsonData
-        });
-    }
-
-    // 메타데이터 저장
-    await db.metadata.put({ key: 'lastUpdate', value: new Date().toLocaleString() });
-}
-
-// 시트 탭 생성
-function createSheetTabs(sheetNames) {
-    sheetTabs.innerHTML = '';
-    tabsSection.classList.remove('hidden');
-
-    sheetNames.forEach(sheetName => {
-        const tab = document.createElement('button');
-        tab.className = 'px-6 py-3 rounded-lg font-medium transition-all';
-        tab.textContent = sheetName;
-        tab.dataset.sheetName = sheetName;
-
-        tab.addEventListener('click', () => {
-            displaySheet(sheetName);
-        });
-
-        sheetTabs.appendChild(tab);
-    });
-
-    // 첫 번째 탭 활성화
-    if (sheetTabs.firstChild) {
-        updateActiveTab(sheetNames[0]);
-    }
-}
-
-// 활성 탭 업데이트
-function updateActiveTab(sheetName) {
-    const tabs = sheetTabs.querySelectorAll('button');
-    tabs.forEach(tab => {
-        if (tab.dataset.sheetName === sheetName) {
-            tab.className = 'px-6 py-3 rounded-lg font-medium transition-all bg-indigo-600 text-white shadow-lg';
-        } else {
-            tab.className = 'px-6 py-3 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200';
-        }
-    });
-}
-
-// 시트 데이터 표시
-async function displaySheet(sheetName, filter = '') {
-    currentSheetName = sheetName;
-    updateActiveTab(sheetName);
-
-    const sheetData = await db.sheets.where('sheetName').equals(sheetName).first();
-    if (!sheetData || !sheetData.data || sheetData.data.length === 0) {
-        return;
-    }
-
-    const jsonData = sheetData.data;
     const headers = jsonData[0];
-
-    // 4W1H 데이터 구조 처리
     const tasks = [];
+
     for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i];
         if (!row || row.length === 0) continue;
@@ -187,142 +110,239 @@ async function displaySheet(sheetName, filter = '') {
         tasks.push(task);
     }
 
-    // 섹션 표시
-    statsSection.classList.remove('hidden');
-    filterSection.classList.remove('hidden');
-    dataSection.classList.remove('hidden');
+    currentData = tasks;
+    await db.data.bulkAdd(tasks);
+    await db.metadata.put({ key: 'lastUpdate', value: new Date().toLocaleString() });
+    await db.metadata.put({ key: 'workDate', value: currentWorkDate });
+}
 
-    // Employee 컬럼 기준으로 집계 (4W1H 데이터 구조)
-    const employeeColumn = 'Employee';
-    const userStats = {};
+// UI 표시
+function showUI() {
+    mainTabsSection.classList.remove('hidden');
+    clearDataBtn.classList.remove('hidden');
+    switchTab('worker-status');
+}
 
-    tasks.forEach(task => {
-        const userName = task[employeeColumn] || '이름 없음';
-        if (!userStats[userName]) {
-            userStats[userName] = {
-                name: userName,
-                count: 0,
-                tasks: []
+// 탭 전환
+mainTabs.addEventListener('click', (e) => {
+    if (e.target.dataset.tab) {
+        switchTab(e.target.dataset.tab);
+    }
+});
+
+function switchTab(tabName) {
+    // 탭 버튼 스타일 업데이트
+    mainTabs.querySelectorAll('button').forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+            btn.className = 'px-6 py-3 font-medium border-b-2 border-indigo-600 text-indigo-600';
+        } else {
+            btn.className = 'px-6 py-3 font-medium text-gray-600 hover:text-indigo-600';
+        }
+    });
+
+    // 탭 컨텐츠 표시
+    workerStatusTab.classList.add('hidden');
+    rawDataTab.classList.add('hidden');
+
+    if (tabName === 'worker-status') {
+        workerStatusTab.classList.remove('hidden');
+        displayWorkerStatus();
+    } else if (tabName === 'raw-data') {
+        rawDataTab.classList.remove('hidden');
+        displayRawData();
+    }
+}
+
+// 작업자 현황 표시
+async function displayWorkerStatus(filter = '') {
+    const data = await db.data.toArray();
+    if (data.length === 0) return;
+
+    // 작업자별 데이터 집계
+    const workerStats = {};
+
+    data.forEach(task => {
+        const employee = task['Employee'] || '이름 없음';
+
+        if (!workerStats[employee]) {
+            workerStats[employee] = {
+                name: employee,
+                totalMH: 0,
+                totalQty: 0,
+                hourlyData: Array(9).fill(null).map(() => ({ mh: 0, qty: 0 })) // 00~08시
             };
         }
-        userStats[userName].count++;
-        userStats[userName].tasks.push(task);
+
+        // HTP Start, HTP End 파싱
+        const htpStart = task['HTP Start'];
+        const htpEnd = task['HTP End'];
+        const unitQty = parseFloat(task['Unit Qty']) || 0;
+
+        if (htpStart && htpEnd) {
+            const mh = calculateMH(htpStart, htpEnd);
+            const { startHour, endHour } = getHourRange(htpStart, htpEnd);
+
+            workerStats[employee].totalMH += mh;
+            workerStats[employee].totalQty += unitQty;
+
+            // 시간대별 할당
+            distributeToHours(workerStats[employee].hourlyData, htpStart, htpEnd, mh, unitQty);
+        }
     });
 
     // 필터 적용
-    let filteredUsers = Object.values(userStats);
+    let workers = Object.values(workerStats);
     if (filter) {
-        filteredUsers = filteredUsers.filter(user =>
-            user.name.toLowerCase().includes(filter.toLowerCase())
-        );
+        workers = workers.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()));
     }
 
-    // 통계 업데이트
-    document.getElementById('total-users').textContent = Object.keys(userStats).length;
-    document.getElementById('total-tasks').textContent = tasks.length;
+    // 테이블 생성
+    const tbody = document.getElementById('worker-status-body');
+    tbody.innerHTML = '';
 
-    const metadata = await db.metadata.get('lastUpdate');
-    document.getElementById('last-update').textContent = metadata ? metadata.value : '-';
+    workers.forEach(worker => {
+        const row = document.createElement('tr');
+        row.className = 'border-b hover:bg-gray-50';
 
-    // 사용자 카드 생성
-    dataGrid.innerHTML = '';
-    filteredUsers.forEach(user => {
-        const card = document.createElement('div');
-        card.className = 'bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white cursor-pointer transition-all hover:-translate-y-2 hover:shadow-2xl';
-        card.innerHTML = `
-            <div class="text-2xl font-bold mb-4">${user.name}</div>
-            <div class="flex justify-between gap-4">
-                <div class="flex-1 bg-white bg-opacity-20 rounded-xl p-4 text-center">
-                    <div class="text-xs opacity-90 mb-1">작업 수</div>
-                    <div class="text-2xl font-bold">${user.count}</div>
-                </div>
-            </div>
+        let html = `
+            <td class="px-3 py-2 font-medium sticky left-0 bg-white">${worker.name}</td>
+            <td class="px-3 py-2 text-center">${worker.totalMH.toFixed(2)}</td>
+            <td class="px-3 py-2 text-center">${worker.totalQty.toFixed(0)}</td>
         `;
-        card.addEventListener('click', () => showUserDetail(user));
-        dataGrid.appendChild(card);
+
+        // 00~08시 데이터
+        for (let i = 0; i < 9; i++) {
+            const hourData = worker.hourlyData[i];
+            if (hourData.mh > 0) {
+                html += `<td class="px-3 py-2 text-center text-xs">
+                    <div class="font-semibold text-indigo-600">${hourData.mh.toFixed(2)}</div>
+                    <div class="text-gray-500">${hourData.qty.toFixed(0)}</div>
+                </td>`;
+            } else {
+                html += `<td class="px-3 py-2 text-center text-gray-300">-</td>`;
+            }
+        }
+
+        row.innerHTML = html;
+        tbody.appendChild(row);
     });
 }
 
-// 사용자 상세 정보 표시
-function showUserDetail(user) {
-    modalTitle.textContent = `${user.name} - 상세 정보`;
+// HTP 시간 차이 계산 (MH = (HTP End - HTP Start) * 24)
+function calculateMH(htpStart, htpEnd) {
+    const start = parseTime(htpStart);
+    const end = parseTime(htpEnd);
 
-    if (user.tasks.length === 0) {
-        modalBody.innerHTML = '<p class="text-gray-500">작업 내역이 없습니다.</p>';
-        detailModal.classList.remove('hidden');
-        detailModal.classList.add('flex');
-        return;
+    let diffHours = end - start;
+
+    // 자정을 넘어가는 경우 처리
+    if (diffHours < 0) {
+        diffHours += 24;
     }
 
-    // 테이블 헤더 생성 (첫 번째 작업의 키를 기준으로)
-    const headers = Object.keys(user.tasks[0]);
+    return diffHours;
+}
 
-    let tableHTML = `
-        <div class="overflow-x-auto">
-            <table class="w-full border-collapse text-sm">
-                <thead>
-                    <tr class="bg-indigo-50">
-    `;
+// 시간 문자열을 시간(소수)로 변환
+function parseTime(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    const seconds = parseInt(parts[2]) || 0;
+    return hours + minutes / 60 + seconds / 3600;
+}
 
+// 시작/종료 시간대 구하기
+function getHourRange(htpStart, htpEnd) {
+    const start = parseTime(htpStart);
+    const end = parseTime(htpEnd);
+    return {
+        startHour: Math.floor(start),
+        endHour: Math.floor(end)
+    };
+}
+
+// 시간대별로 MH와 수량 분배
+function distributeToHours(hourlyData, htpStart, htpEnd, totalMH, totalQty) {
+    const start = parseTime(htpStart);
+    const end = parseTime(htpEnd);
+
+    let currentTime = start;
+    const endTime = end > start ? end : end + 24;
+
+    while (currentTime < endTime) {
+        const currentHour = Math.floor(currentTime) % 24;
+        const nextHour = currentTime + 1;
+        const segmentEnd = Math.min(Math.ceil(currentTime), endTime);
+
+        const segmentDuration = segmentEnd - currentTime;
+        const ratio = segmentDuration / totalMH;
+
+        // 00~08시 범위만 처리
+        if (currentHour >= 0 && currentHour <= 8) {
+            hourlyData[currentHour].mh += segmentDuration;
+            hourlyData[currentHour].qty += totalQty * ratio;
+        }
+
+        currentTime = segmentEnd;
+    }
+}
+
+// 원본 데이터 표시
+async function displayRawData() {
+    const data = await db.data.toArray();
+    if (data.length === 0) return;
+
+    const headers = Object.keys(data[0]);
+
+    // 헤더 생성
+    const headerRow = document.getElementById('raw-data-header');
+    headerRow.innerHTML = '';
     headers.forEach(header => {
-        tableHTML += `<th class="px-3 py-2 text-left text-indigo-600 font-semibold border-b border-gray-200 whitespace-nowrap">${header}</th>`;
+        const th = document.createElement('th');
+        th.className = 'px-3 py-2 text-left font-semibold';
+        th.textContent = header;
+        headerRow.appendChild(th);
     });
 
-    tableHTML += `
-                    </tr>
-                </thead>
-                <tbody>
-    `;
+    // 데이터 생성
+    const tbody = document.getElementById('raw-data-body');
+    tbody.innerHTML = '';
 
-    user.tasks.forEach(task => {
-        tableHTML += '<tr class="hover:bg-indigo-50 transition-colors">';
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b hover:bg-gray-50';
+
         headers.forEach(header => {
-            const value = task[header] || '-';
-            tableHTML += `<td class="px-3 py-2 border-b border-gray-100 whitespace-nowrap">${value}</td>`;
+            const td = document.createElement('td');
+            td.className = 'px-3 py-2 text-sm';
+            td.textContent = row[header] || '-';
+            tr.appendChild(td);
         });
-        tableHTML += '</tr>';
+
+        tbody.appendChild(tr);
     });
-
-    tableHTML += '</tbody></table></div>';
-    modalBody.innerHTML = tableHTML;
-
-    detailModal.classList.remove('hidden');
-    detailModal.classList.add('flex');
 }
 
-// 모달 닫기
-modalClose.addEventListener('click', () => {
-    detailModal.classList.add('hidden');
-    detailModal.classList.remove('flex');
-});
-
-detailModal.addEventListener('click', (e) => {
-    if (e.target === detailModal) {
-        detailModal.classList.add('hidden');
-        detailModal.classList.remove('flex');
-    }
-});
-
-// 검색 기능
-searchInput.addEventListener('input', (e) => {
-    if (currentSheetName) {
-        displaySheet(currentSheetName, e.target.value);
-    }
+// 작업자 검색
+workerSearch.addEventListener('input', (e) => {
+    displayWorkerStatus(e.target.value);
 });
 
 // 데이터 초기화
 clearDataBtn.addEventListener('click', async () => {
     if (confirm('모든 데이터를 삭제하시겠습니까?')) {
-        await db.sheets.clear();
+        await db.data.clear();
         await db.metadata.clear();
 
-        tabsSection.classList.add('hidden');
-        statsSection.classList.add('hidden');
-        filterSection.classList.add('hidden');
-        dataSection.classList.add('hidden');
+        mainTabsSection.classList.add('hidden');
+        workerStatusTab.classList.add('hidden');
+        rawDataTab.classList.add('hidden');
+        clearDataBtn.classList.add('hidden');
 
-        currentWorkbook = null;
-        currentSheetName = null;
+        currentData = [];
+        currentWorkDate = null;
 
         showToast('모든 데이터가 삭제되었습니다.');
     }
@@ -330,10 +350,13 @@ clearDataBtn.addEventListener('click', async () => {
 
 // 페이지 로드 시 저장된 데이터 표시
 window.addEventListener('load', async () => {
-    const sheets = await db.sheets.toArray();
-    if (sheets.length > 0) {
-        const sheetNames = sheets.map(s => s.sheetName);
-        createSheetTabs(sheetNames);
-        await displaySheet(sheetNames[0]);
+    const data = await db.data.toArray();
+    if (data.length > 0) {
+        currentData = data;
+        const metadata = await db.metadata.get('workDate');
+        if (metadata) {
+            currentWorkDate = metadata.value;
+        }
+        showUI();
     }
 });
