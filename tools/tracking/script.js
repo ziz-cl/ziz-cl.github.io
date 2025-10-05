@@ -232,8 +232,25 @@ async function displayWorkerStatus() {
         }
     });
 
-    console.log('LMS 매핑:', lmsMap);
+    // HL LMS 데이터 로드 (이름 매칭 및 시프트 시간 범위)
+    const hlLmsData = await db.hlLmsData.toArray();
+    hlLmsData.forEach(item => {
+        const employeeId = item.employeeId;
+
+        if (employeeId) {
+            // HL LMS 데이터로 덮어쓰거나 추가 (HL LMS가 우선순위)
+            lmsMap[employeeId] = {
+                workerName: item.nickname,
+                shift: item.wave,
+                shiftStart: item.shiftStart,
+                shiftEnd: item.shiftEnd
+            };
+        }
+    });
+
+    console.log('LMS 매핑 (LMS + HL LMS):', lmsMap);
     console.log('LMS 원본 데이터:', lmsData);
+    console.log('HL LMS 원본 데이터:', hlLmsData);
 
     // 작업자별 데이터 집계
     const workerStats = {};
