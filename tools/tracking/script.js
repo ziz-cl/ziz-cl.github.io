@@ -908,8 +908,8 @@ function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, 
 
     // 헤더 생성 (이름, 작업자, Total Unit, Location들을 열로)
     headerElement.innerHTML = `
-        <th class="px-3 py-2 text-center font-semibold border border-gray-300 sticky left-0 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">이름</th>
-        <th class="px-3 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">작업자</th>
+        <th class="px-1 py-2 text-center font-semibold border border-gray-300 sticky left-0 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">이름</th>
+        <th class="px-1 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">작업자</th>
         <th class="px-2 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">Total Unit</th>
     `;
 
@@ -986,8 +986,8 @@ function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, 
         });
 
         let rowHtml = `
-            <td class="px-3 py-2 font-medium text-center border border-gray-300 sticky left-0 bg-white">${workerName}</td>
-            <td class="px-3 py-2 text-center border border-gray-300 bg-white">${worker.name}</td>
+            <td class="px-1 py-2 font-medium text-center border border-gray-300 sticky left-0 bg-white">${workerName}</td>
+            <td class="px-1 py-2 text-center border border-gray-300 bg-white">${worker.name}</td>
             <td class="px-2 py-2 text-center border border-gray-300 bg-white font-semibold">${totalUnit.toFixed(0)}</td>
         `;
 
