@@ -472,7 +472,7 @@ async function displayWorkerStatus() {
                 </td>
             `;
 
-            // Night 시간대: 00~08시 (당일)
+            // Night 시간대: 00(24)~08시
             for (let i = 0; i <= 8; i++) {
                 const hourData = worker.hourlyData[i];
 
@@ -484,30 +484,6 @@ async function displayWorkerStatus() {
                         isInShiftRange = (i >= validHours.start && i <= validHours.end);
                     } else {
                         // 자정을 넘는 경우 (예: 22:00 ~ 06:00)
-                        isInShiftRange = (i >= validHours.start || i <= validHours.end);
-                    }
-                }
-
-                if (hourData.totalMH > 0 && isInShiftRange) {
-                    const htp = hourData.totalQty / hourData.totalMH;
-                    nightHtml += `<td class="px-2 py-2 text-center">
-                        <div class="font-semibold text-indigo-700">${htp.toFixed(0)}</div>
-                    </td>`;
-                } else {
-                    nightHtml += `<td class="px-2 py-2 text-center text-gray-300">-</td>`;
-                }
-            }
-
-            // Night 시간대: 24~32시 (다음날 00~08시 데이터 반복)
-            for (let i = 0; i <= 8; i++) {
-                const hourData = worker.hourlyData[i];
-
-                // 시프트 범위 체크 (동일한 로직)
-                let isInShiftRange = true;
-                if (validHours) {
-                    if (validHours.start < validHours.end) {
-                        isInShiftRange = (i >= validHours.start && i <= validHours.end);
-                    } else {
                         isInShiftRange = (i >= validHours.start || i <= validHours.end);
                     }
                 }
