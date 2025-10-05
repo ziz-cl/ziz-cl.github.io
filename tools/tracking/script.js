@@ -649,12 +649,118 @@ async function displayWorkerStatus() {
         }
     });
 
+    // HTP 테이블에 표시된 작업자 목록 수집
+    const dayWorkers = [];
+    const nightWorkers = [];
+
+    workers.forEach(worker => {
+        const lmsInfo = lmsMap[worker.name];
+        const isHlLms = lmsInfo && lmsInfo.isHlLms;
+
+        // Day 데이터 확인
+        const dayData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+        if (dayData) {
+            let validHours = null;
+            if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+                const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+                const endTimeParts = lmsInfo.shiftEnd.split(':');
+                const endHour = parseInt(endTimeParts[0]);
+                const endMinute = parseInt(endTimeParts[1]) || 0;
+                const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+                validHours = { start: startHour, end: actualEndHour };
+            }
+
+            let hasValidDayShift = false;
+            if (!validHours) {
+                hasValidDayShift = true;
+            } else {
+                for (let i = 9; i <= 18; i++) {
+                    if (i >= validHours.start && i <= validHours.end) {
+                        hasValidDayShift = true;
+                        break;
+                    }
+                }
+            }
+
+            let dayMH = 0;
+            for (let i = 9; i <= 18; i++) {
+                const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
+                if (isInShiftRange) {
+                    dayMH += dayData.hourlyData[i].totalMH;
+                }
+            }
+
+            if (dayMH > 0 && hasValidDayShift) {
+                dayWorkers.push({ worker, isHlLms, lmsInfo });
+            }
+        }
+
+        // Night 데이터 확인
+        let nightData = null;
+        if (isHlLms) {
+            nightData = previousDate && worker.dates[previousDate] ? worker.dates[previousDate] : null;
+        } else {
+            nightData = latestDate && worker.dates[latestDate] ? worker.dates[latestDate] : null;
+        }
+
+        if (nightData) {
+            let validHours = null;
+            if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+                const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+                const endTimeParts = lmsInfo.shiftEnd.split(':');
+                const endHour = parseInt(endTimeParts[0]);
+                const endMinute = parseInt(endTimeParts[1]) || 0;
+                const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+                validHours = { start: startHour, end: actualEndHour };
+            }
+
+            let hasValidNightShift = false;
+            if (!validHours) {
+                hasValidNightShift = true;
+            } else {
+                for (let i = 0; i <= 8; i++) {
+                    if (validHours.start < validHours.end) {
+                        if (i >= validHours.start && i <= validHours.end) {
+                            hasValidNightShift = true;
+                            break;
+                        }
+                    } else {
+                        if (i >= validHours.start || i <= validHours.end) {
+                            hasValidNightShift = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let nightMH = 0;
+            for (let i = 0; i <= 8; i++) {
+                let isInShiftRange = true;
+                if (validHours) {
+                    if (validHours.start < validHours.end) {
+                        isInShiftRange = (i >= validHours.start && i <= validHours.end);
+                    } else {
+                        isInShiftRange = (i >= validHours.start || i <= validHours.end);
+                    }
+                }
+                if (isInShiftRange) {
+                    const hourIndex = isHlLms ? (24 + i) : i;
+                    nightMH += nightData.hourlyData[hourIndex].totalMH;
+                }
+            }
+
+            if (nightMH > 0 && hasValidNightShift) {
+                nightWorkers.push({ worker, isHlLms, lmsInfo });
+            }
+        }
+    });
+
     // Location 테이블 표시
-    displayLocationTables(data, workers, lmsMap);
+    displayLocationTables(data, dayWorkers, nightWorkers, lmsMap);
 }
 
 // Location별 작업 현황 표시
-async function displayLocationTables(data, workers, lmsMap) {
+async function displayLocationTables(data, dayWorkers, nightWorkers, lmsMap) {
     const dayHour = parseInt(dayLocationHourSelect.value);
     const nightHour = parseInt(nightLocationHourSelect.value);
 
@@ -726,7 +832,7 @@ async function displayLocationTables(data, workers, lmsMap) {
     // Day Location 테이블 생성
     displayLocationTable(
         locationData,
-        workers,
+        dayWorkers,
         lmsMap,
         dayHour,
         latestDate,
@@ -739,7 +845,7 @@ async function displayLocationTables(data, workers, lmsMap) {
     // Night Location 테이블 생성
     displayLocationTable(
         locationData,
-        workers,
+        nightWorkers,
         lmsMap,
         nightHour,
         latestDate,
@@ -751,65 +857,8 @@ async function displayLocationTables(data, workers, lmsMap) {
 }
 
 // Location 테이블 표시
-function displayLocationTable(locationData, workers, lmsMap, selectedHour, latestDate, previousDate, headerElement, bodyElement, type) {
-    // 작업자 필터링 및 시프트 범위 확인
-    const validWorkers = [];
-
-    workers.forEach(worker => {
-        const lmsInfo = lmsMap[worker.name];
-        const isHlLms = lmsInfo && lmsInfo.isHlLms;
-
-        // 시프트 시간 범위 계산
-        let validHours = null;
-        if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
-            const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
-            const endTimeParts = lmsInfo.shiftEnd.split(':');
-            const endHour = parseInt(endTimeParts[0]);
-            const endMinute = parseInt(endTimeParts[1]) || 0;
-            const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
-            validHours = { start: startHour, end: actualEndHour };
-        }
-
-        // Day/Night 시간대와 시프트 겹침 확인
-        let hasValidShift = false;
-
-        if (type === 'day') {
-            // Day: 09~18시
-            if (!validHours) {
-                hasValidShift = true;
-            } else {
-                for (let i = 9; i <= 18; i++) {
-                    if (i >= validHours.start && i <= validHours.end) {
-                        hasValidShift = true;
-                        break;
-                    }
-                }
-            }
-        } else {
-            // Night: 00~08시
-            if (!validHours) {
-                hasValidShift = true;
-            } else {
-                for (let i = 0; i <= 8; i++) {
-                    if (validHours.start < validHours.end) {
-                        if (i >= validHours.start && i <= validHours.end) {
-                            hasValidShift = true;
-                            break;
-                        }
-                    } else {
-                        if (i >= validHours.start || i <= validHours.end) {
-                            hasValidShift = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (hasValidShift) {
-            validWorkers.push({ worker, isHlLms, lmsInfo });
-        }
-    });
+function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, latestDate, previousDate, headerElement, bodyElement, type) {
+    // validWorkers는 이미 HTP 테이블에서 필터링되어 전달됨
 
     // 모든 Location 수집
     const locations = Object.keys(locationData).sort();
