@@ -416,11 +416,15 @@ async function displayWorkerStatus() {
 
             const dayTotalHTP = dayMH > 0 ? dayQty / dayMH : 0;
 
+            // Total HTP 배경색
+            const totalBgColor = dayTotalHTP >= 470 ? 'bg-blue-100' : 'bg-red-100';
+            const totalTextColor = dayTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
+
             let dayHtml = `
-                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
-                <td class="px-3 py-2 font-medium">${worker.name}</td>
-                <td class="px-3 py-2 text-center">
-                    <div class="font-semibold text-blue-700">${dayTotalHTP.toFixed(0)}</div>
+                <td class="px-3 py-2 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-3 py-2 font-medium border border-gray-300">${worker.name}</td>
+                <td class="px-3 py-2 text-center border border-gray-300 ${totalBgColor}">
+                    <div class="font-semibold ${totalTextColor}">${dayTotalHTP.toFixed(0)}</div>
                 </td>
             `;
 
@@ -433,11 +437,13 @@ async function displayWorkerStatus() {
 
                 if (hourData.totalMH > 0 && isInShiftRange) {
                     const htp = hourData.totalQty / hourData.totalMH;
-                    dayHtml += `<td class="px-2 py-2 text-center">
-                        <div class="font-semibold text-blue-700">${htp.toFixed(0)}</div>
+                    const bgColor = htp >= 470 ? 'bg-blue-100' : 'bg-red-100';
+                    const textColor = htp >= 470 ? 'text-blue-800' : 'text-red-800';
+                    dayHtml += `<td class="px-2 py-2 text-center border border-gray-300 ${bgColor}">
+                        <div class="font-semibold ${textColor}">${htp.toFixed(0)}</div>
                     </td>`;
                 } else {
-                    dayHtml += `<td class="px-2 py-2 text-center text-gray-300">-</td>`;
+                    dayHtml += `<td class="px-2 py-2 text-center text-gray-400 border border-gray-300">-</td>`;
                 }
             }
 
@@ -551,11 +557,15 @@ async function displayWorkerStatus() {
 
             const nightTotalHTP = nightMH > 0 ? nightQty / nightMH : 0;
 
+            // Total HTP 배경색
+            const totalBgColor = nightTotalHTP >= 470 ? 'bg-blue-100' : 'bg-red-100';
+            const totalTextColor = nightTotalHTP >= 470 ? 'text-blue-800' : 'text-red-800';
+
             let nightHtml = `
-                <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
-                <td class="px-3 py-2 font-medium">${worker.name}</td>
-                <td class="px-3 py-2 text-center">
-                    <div class="font-semibold text-indigo-700">${nightTotalHTP.toFixed(0)}</div>
+                <td class="px-3 py-2 font-medium sticky left-0 bg-white border border-gray-300">${workerName}</td>
+                <td class="px-3 py-2 font-medium border border-gray-300">${worker.name}</td>
+                <td class="px-3 py-2 text-center border border-gray-300 ${totalBgColor}">
+                    <div class="font-semibold ${totalTextColor}">${nightTotalHTP.toFixed(0)}</div>
                 </td>
             `;
 
@@ -579,11 +589,13 @@ async function displayWorkerStatus() {
 
                 if (hourData.totalMH > 0 && isInShiftRange) {
                     const htp = hourData.totalQty / hourData.totalMH;
-                    nightHtml += `<td class="px-2 py-2 text-center">
-                        <div class="font-semibold text-indigo-700">${htp.toFixed(0)}</div>
+                    const bgColor = htp >= 470 ? 'bg-blue-100' : 'bg-red-100';
+                    const textColor = htp >= 470 ? 'text-blue-800' : 'text-red-800';
+                    nightHtml += `<td class="px-2 py-2 text-center border border-gray-300 ${bgColor}">
+                        <div class="font-semibold ${textColor}">${htp.toFixed(0)}</div>
                     </td>`;
                 } else {
-                    nightHtml += `<td class="px-2 py-2 text-center text-gray-300">-</td>`;
+                    nightHtml += `<td class="px-2 py-2 text-center text-gray-400 border border-gray-300">-</td>`;
                 }
             }
 
