@@ -1,8 +1,9 @@
 // IndexedDB 설정 (Dexie.js 사용)
 const db = new Dexie('WorkTrackingDB');
-db.version(4).stores({
+db.version(5).stores({
     data: '++id, employee',
     lmsData: '++id, employeeId, shift',
+    hlLmsData: '++id, employeeId',
     metadata: 'key, value'
 });
 
@@ -17,6 +18,7 @@ const mainTabsSection = document.getElementById('main-tabs-section');
 const mainTabs = document.getElementById('main-tabs');
 const workerStatusTab = document.getElementById('worker-status-tab');
 const lmsTab = document.getElementById('lms-tab');
+const hlLmsTab = document.getElementById('hl-lms-tab');
 const rawDataTab = document.getElementById('raw-data-tab');
 const toast = document.getElementById('toast');
 const lmsInput = document.getElementById('lms-input');
@@ -24,6 +26,8 @@ const parseLmsBtn = document.getElementById('parse-lms-btn');
 const clearLmsBtn = document.getElementById('clear-lms-btn');
 const lmsResult = document.getElementById('lms-result');
 const lmsTableBody = document.getElementById('lms-table-body');
+const addHlLmsRowBtn = document.getElementById('add-hl-lms-row');
+const hlLmsBody = document.getElementById('hl-lms-body');
 
 // 토스트 메시지 표시
 function showToast(message) {
@@ -161,6 +165,7 @@ async function switchTab(tabName) {
     // 탭 컨텐츠 표시
     workerStatusTab.classList.add('hidden');
     lmsTab.classList.add('hidden');
+    hlLmsTab.classList.add('hidden');
     rawDataTab.classList.add('hidden');
 
     if (tabName === 'worker-status') {
@@ -174,6 +179,10 @@ async function switchTab(tabName) {
             displayLmsData(savedLmsData);
             lmsResult.classList.remove('hidden');
         }
+    } else if (tabName === 'hl-lms') {
+        hlLmsTab.classList.remove('hidden');
+        // 저장된 HL LMS 데이터 표시
+        await loadHlLmsData();
     } else if (tabName === 'raw-data') {
         rawDataTab.classList.remove('hidden');
         displayRawData();
@@ -802,6 +811,106 @@ function displayLmsData(lmsData) {
 
     console.log('LMS 테이블 표시 완료:', lmsData.length, '건');
 }
+
+// HL LMS 자동 저장 함수
+async function autoSaveHlLmsData() {
+    const rows = hlLmsBody.querySelectorAll('tr');
+    const hlLmsData = [];
+
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const rowData = {
+            nickname: inputs[0].value.trim(),
+            employeeId: inputs[1].value.trim(),
+            wave: inputs[2].value.trim(),
+            shiftStart: inputs[3].value,
+            shiftEnd: inputs[4].value
+        };
+
+        // 최소한 작업자아이디가 있어야 저장
+        if (rowData.employeeId) {
+            hlLmsData.push(rowData);
+        }
+    });
+
+    try {
+        // 기존 데이터 삭제 후 새로 저장
+        await db.hlLmsData.clear();
+        if (hlLmsData.length > 0) {
+            await db.hlLmsData.bulkAdd(hlLmsData);
+        }
+        console.log('HL LMS 자동 저장:', hlLmsData.length, '건');
+    } catch (error) {
+        console.error('HL LMS 자동 저장 오류:', error);
+    }
+}
+
+// HL LMS 관련 함수들
+function createHlLmsRow(data = {}) {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50';
+    row.innerHTML = `
+        <td class="border border-gray-300 px-2 py-1">
+            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   placeholder="닉네임" value="${data.nickname || ''}" data-field="nickname">
+        </td>
+        <td class="border border-gray-300 px-2 py-1">
+            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   placeholder="12345678" value="${data.employeeId || ''}" data-field="employeeId">
+        </td>
+        <td class="border border-gray-300 px-2 py-1">
+            <input type="text" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   placeholder="Wave1" value="${data.wave || ''}" data-field="wave">
+        </td>
+        <td class="border border-gray-300 px-2 py-1">
+            <input type="time" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   value="${data.shiftStart || ''}" data-field="shiftStart">
+        </td>
+        <td class="border border-gray-300 px-2 py-1">
+            <input type="time" class="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded hl-lms-input"
+                   value="${data.shiftEnd || ''}" data-field="shiftEnd">
+        </td>
+        <td class="border border-gray-300 px-2 py-1 text-center">
+            <button class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs delete-hl-lms-row">
+                삭제
+            </button>
+        </td>
+    `;
+
+    // 삭제 버튼 이벤트
+    row.querySelector('.delete-hl-lms-row').addEventListener('click', async () => {
+        row.remove();
+        await autoSaveHlLmsData();
+    });
+
+    // 각 input에 자동 저장 이벤트 추가
+    row.querySelectorAll('.hl-lms-input').forEach(input => {
+        input.addEventListener('change', autoSaveHlLmsData);
+        input.addEventListener('blur', autoSaveHlLmsData);
+    });
+
+    return row;
+}
+
+// HL LMS 데이터 로드
+async function loadHlLmsData() {
+    const data = await db.hlLmsData.toArray();
+    hlLmsBody.innerHTML = '';
+
+    if (data.length === 0) {
+        // 기본 행 1개 추가
+        hlLmsBody.appendChild(createHlLmsRow());
+    } else {
+        data.forEach(item => {
+            hlLmsBody.appendChild(createHlLmsRow(item));
+        });
+    }
+}
+
+// 행 추가 버튼
+addHlLmsRowBtn.addEventListener('click', () => {
+    hlLmsBody.appendChild(createHlLmsRow());
+});
 
 // 페이지 로드 시 저장된 데이터 표시
 window.addEventListener('load', async () => {

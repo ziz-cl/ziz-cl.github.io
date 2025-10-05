@@ -25,6 +25,7 @@
             <div class="flex border-b border-gray-200" id="main-tabs">
                 <button class="px-6 py-3 font-medium border-b-2 border-indigo-600 text-indigo-600" data-tab="worker-status">작업자 현황</button>
                 <button class="px-6 py-3 font-medium text-gray-600 hover:text-indigo-600" data-tab="lms">LMS</button>
+                <button class="px-6 py-3 font-medium text-gray-600 hover:text-indigo-600" data-tab="hl-lms">HL LMS</button>
                 <button class="px-6 py-3 font-medium text-gray-600 hover:text-indigo-600" data-tab="raw-data">4W1H</button>
             </div>
         </div>
@@ -135,6 +136,35 @@
                         <tbody id="lms-table-body"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- HL LMS 탭 -->
+        <div class="bg-white rounded-lg shadow-lg p-6 hidden" id="hl-lms-tab">
+            <div class="mb-4 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-900">HL LMS 작업자 정보</h2>
+                <div class="flex gap-3">
+                    <button id="add-hl-lms-row" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all">
+                        + 행 추가
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm border-collapse" id="hl-lms-table">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">NickName</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">작업자아이디</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">Wave</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">시프트 시작시간</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left font-semibold">시프트 종료시간</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center font-semibold">삭제</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hl-lms-body">
+                        <!-- 행들이 여기에 추가됩니다 -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
