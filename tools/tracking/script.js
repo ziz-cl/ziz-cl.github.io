@@ -278,40 +278,59 @@ async function displayWorkerStatus() {
     dayTbody.innerHTML = '';
 
     workers.forEach(worker => {
-        // Day 시간대 합계 계산
+        // LMS에서 이름 및 시프트 시간 찾기
+        const lmsInfo = lmsMap[worker.name];
+        const workerName = lmsInfo ? lmsInfo.workerName : '-';
+
+        // 시프트 시간 범위 계산 (시 단위)
+        let validHours = null;
+        if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+            const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+            const endTimeParts = lmsInfo.shiftEnd.split(':');
+            const endHour = parseInt(endTimeParts[0]);
+            const endMinute = parseInt(endTimeParts[1]) || 0;
+
+            // 종료 시간이 정각(00분)이면 이전 시간대까지만 포함
+            // 예: 09:00 종료 -> 08시까지, 09:30 종료 -> 09시까지
+            const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+
+            validHours = { start: startHour, end: actualEndHour };
+            console.log(`${worker.name} 시프트: ${startHour}시-${actualEndHour}시 (원본: ${lmsInfo.shiftStart}-${lmsInfo.shiftEnd})`);
+        }
+
+        // Day 시간대(09~18시)와 시프트가 겹치는지 확인
+        let hasValidDayShift = false;
+        if (!validHours) {
+            // 시프트 정보가 없으면 기존 로직 사용
+            hasValidDayShift = true;
+        } else {
+            // Day 시간대(09~18시) 중 하나라도 시프트 범위에 포함되는지 확인
+            for (let i = 9; i <= 18; i++) {
+                if (i >= validHours.start && i <= validHours.end) {
+                    hasValidDayShift = true;
+                    break;
+                }
+            }
+        }
+
+        // Day 시간대 합계 계산 (시프트 범위 내에서만)
         let dayMH = 0;
         let dayQty = 0;
         for (let i = 9; i <= 18; i++) {
-            dayMH += worker.hourlyData[i].totalMH;
-            dayQty += worker.hourlyData[i].totalQty;
+            // 시프트 범위 체크
+            const isInShiftRange = !validHours || (i >= validHours.start && i <= validHours.end);
+            if (isInShiftRange) {
+                dayMH += worker.hourlyData[i].totalMH;
+                dayQty += worker.hourlyData[i].totalQty;
+            }
         }
 
-        // Day 시간대에 작업이 있는 경우에만 표시
-        if (dayMH > 0) {
+        // Day 시간대에 작업이 있고 시프트가 겹치는 경우에만 표시
+        if (dayMH > 0 && hasValidDayShift) {
             const dayRow = document.createElement('tr');
             dayRow.className = 'border-b hover:bg-gray-50';
 
             const dayTotalHTP = dayMH > 0 ? dayQty / dayMH : 0;
-
-            // LMS에서 이름 및 시프트 시간 찾기
-            const lmsInfo = lmsMap[worker.name];
-            const workerName = lmsInfo ? lmsInfo.workerName : '-';
-
-            // 시프트 시간 범위 계산 (시 단위)
-            let validHours = null;
-            if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
-                const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
-                const endTimeParts = lmsInfo.shiftEnd.split(':');
-                const endHour = parseInt(endTimeParts[0]);
-                const endMinute = parseInt(endTimeParts[1]) || 0;
-
-                // 종료 시간이 정각(00분)이면 이전 시간대까지만 포함
-                // 예: 09:00 종료 -> 08시까지, 09:30 종료 -> 09시까지
-                const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
-
-                validHours = { start: startHour, end: actualEndHour };
-                console.log(`${worker.name} Day 시프트: ${startHour}시-${actualEndHour}시 (원본: ${lmsInfo.shiftStart}-${lmsInfo.shiftEnd})`);
-            }
 
             let dayHtml = `
                 <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
@@ -348,40 +367,75 @@ async function displayWorkerStatus() {
     nightTbody.innerHTML = '';
 
     workers.forEach(worker => {
-        // Night 시간대 합계 계산
+        // LMS에서 이름 및 시프트 시간 찾기
+        const lmsInfo = lmsMap[worker.name];
+        const workerName = lmsInfo ? lmsInfo.workerName : '-';
+
+        // 시프트 시간 범위 계산 (시 단위)
+        let validHours = null;
+        if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
+            const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
+            const endTimeParts = lmsInfo.shiftEnd.split(':');
+            const endHour = parseInt(endTimeParts[0]);
+            const endMinute = parseInt(endTimeParts[1]) || 0;
+
+            // 종료 시간이 정각(00분)이면 이전 시간대까지만 포함
+            // 예: 09:00 종료 -> 08시까지, 09:30 종료 -> 09시까지
+            const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
+
+            validHours = { start: startHour, end: actualEndHour };
+        }
+
+        // Night 시간대(00~08시)와 시프트가 겹치는지 확인
+        let hasValidNightShift = false;
+        if (!validHours) {
+            // 시프트 정보가 없으면 기존 로직 사용
+            hasValidNightShift = true;
+        } else {
+            // Night 시간대(00~08시) 중 하나라도 시프트 범위에 포함되는지 확인
+            for (let i = 0; i <= 8; i++) {
+                // 자정을 넘어가는 경우 처리
+                if (validHours.start < validHours.end) {
+                    // 일반적인 경우 (예: 01:30 ~ 09:00)
+                    if (i >= validHours.start && i <= validHours.end) {
+                        hasValidNightShift = true;
+                        break;
+                    }
+                } else {
+                    // 자정을 넘는 경우 (예: 22:00 ~ 06:00)
+                    if (i >= validHours.start || i <= validHours.end) {
+                        hasValidNightShift = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Night 시간대 합계 계산 (시프트 범위 내에서만)
         let nightMH = 0;
         let nightQty = 0;
         for (let i = 0; i <= 8; i++) {
-            nightMH += worker.hourlyData[i].totalMH;
-            nightQty += worker.hourlyData[i].totalQty;
+            // 시프트 범위 체크
+            let isInShiftRange = true;
+            if (validHours) {
+                if (validHours.start < validHours.end) {
+                    isInShiftRange = (i >= validHours.start && i <= validHours.end);
+                } else {
+                    isInShiftRange = (i >= validHours.start || i <= validHours.end);
+                }
+            }
+            if (isInShiftRange) {
+                nightMH += worker.hourlyData[i].totalMH;
+                nightQty += worker.hourlyData[i].totalQty;
+            }
         }
 
-        // Night 시간대에 작업이 있는 경우에만 표시
-        if (nightMH > 0) {
+        // Night 시간대에 작업이 있고 시프트가 겹치는 경우에만 표시
+        if (nightMH > 0 && hasValidNightShift) {
             const nightRow = document.createElement('tr');
             nightRow.className = 'border-b hover:bg-gray-50';
 
             const nightTotalHTP = nightMH > 0 ? nightQty / nightMH : 0;
-
-            // LMS에서 이름 및 시프트 시간 찾기
-            const lmsInfo = lmsMap[worker.name];
-            const workerName = lmsInfo ? lmsInfo.workerName : '-';
-
-            // 시프트 시간 범위 계산 (시 단위)
-            let validHours = null;
-            if (lmsInfo && lmsInfo.shiftStart && lmsInfo.shiftEnd) {
-                const startHour = parseInt(lmsInfo.shiftStart.split(':')[0]);
-                const endTimeParts = lmsInfo.shiftEnd.split(':');
-                const endHour = parseInt(endTimeParts[0]);
-                const endMinute = parseInt(endTimeParts[1]) || 0;
-
-                // 종료 시간이 정각(00분)이면 이전 시간대까지만 포함
-                // 예: 09:00 종료 -> 08시까지, 09:30 종료 -> 09시까지
-                const actualEndHour = (endMinute === 0 && endHour > 0) ? endHour - 1 : endHour;
-
-                validHours = { start: startHour, end: actualEndHour };
-                console.log(`${worker.name} Night 시프트: ${startHour}시-${actualEndHour}시 (원본: ${lmsInfo.shiftStart}-${lmsInfo.shiftEnd})`);
-            }
 
             let nightHtml = `
                 <td class="px-3 py-2 font-medium sticky left-0 bg-white">${workerName}</td>
