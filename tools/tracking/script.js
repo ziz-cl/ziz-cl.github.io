@@ -8,16 +8,6 @@ db.version(9).stores({
     metadata: 'key, value'
 });
 
-// 기존 DB 삭제 (한 번만 실행)
-(async () => {
-    try {
-        await Dexie.delete('WorkTrackingDB');
-        console.log('기존 DB 삭제 완료');
-    } catch (err) {
-        console.log('기존 DB 삭제 시도:', err.message);
-    }
-})();
-
 // 전역 변수
 let currentData = [];
 
