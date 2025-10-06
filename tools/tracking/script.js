@@ -344,6 +344,7 @@ async function displayWorkerStatus() {
         const htpEnd = task['HTP End'];
         const processTask = task['Process(Task)'];
         const unitQty = parseFloat(task['Unit Qty']) || 0;
+        const hourOfWorkDate = parseInt(task['HourOfWorkDate']) || null;
 
         if (htpStart && htpEnd) {
             // Process(Task)가 "STOW(STOW)"인 경우만 MH와 수량 모두 반영
@@ -354,8 +355,15 @@ async function displayWorkerStatus() {
                 workerStats[employee].dates[taskDate].totalMH += mh;
                 workerStats[employee].dates[taskDate].totalQty += qty;
 
-                // 시간대별로 MH와 수량 분배 (24~32시 포함)
-                distributeToHourRangesExtended(workerStats[employee].dates[taskDate].hourlyData, htpStart, htpEnd, mh, qty);
+                // 시간대별로 MH와 수량 분배 (HourOfWorkDate 사용)
+                if (hourOfWorkDate !== null && hourOfWorkDate >= 0 && hourOfWorkDate <= 32) {
+                    // HourOfWorkDate를 인덱스로 사용 (0=00시, 1=01시, ..., 24=00시(다음날), 25=01시(다음날), 32=08시(다음날))
+                    workerStats[employee].dates[taskDate].hourlyData[hourOfWorkDate].totalMH += mh;
+                    workerStats[employee].dates[taskDate].hourlyData[hourOfWorkDate].totalQty += qty;
+                } else {
+                    // HourOfWorkDate가 없거나 범위를 벗어나면 기존 방식 사용
+                    distributeToHourRangesExtended(workerStats[employee].dates[taskDate].hourlyData, htpStart, htpEnd, mh, qty);
+                }
             }
         }
     });
