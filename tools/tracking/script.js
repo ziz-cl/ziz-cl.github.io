@@ -1,5 +1,5 @@
 // IndexedDB 설정 (Dexie.js 사용)
-const db = new Dexie('WorkTrackingDB');
+const db = new Dexie('WorkTrackingDBv2');
 db.version(9).stores({
     data: '++id, employee, date',
     lmsData: '++id, employeeId, shift, date',
