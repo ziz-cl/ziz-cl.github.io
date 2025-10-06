@@ -133,16 +133,16 @@ async function parseAndSaveData(jsonData) {
             }
         }
 
-        // Date 컬럼에서 날짜 추출 (YYYY-MM-DD 형식)
-        if (task['Date']) {
+        // Work Date 컬럼에서 날짜 추출 (YYYY-MM-DD 형식)
+        if (task['Work Date']) {
             // Excel 날짜 형식일 수도 있으므로 처리
-            const dateStr = String(task['Date']);
+            const dateStr = String(task['Work Date']);
             // 이미 YYYY-MM-DD 형식이면 그대로 사용
             if (dateStr.match(/\d{4}-\d{2}-\d{2}/)) {
                 task['date'] = dateStr;
             } else {
                 // 다른 형식이면 파싱 시도
-                const parsedDate = new Date(task['Date']);
+                const parsedDate = new Date(task['Work Date']);
                 if (!isNaN(parsedDate.getTime())) {
                     const year = parsedDate.getFullYear();
                     const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
