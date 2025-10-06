@@ -1,5 +1,5 @@
 // IndexedDB 설정 (Dexie.js 사용)
-const db = new Dexie('WorkTrackingDBv2');
+const db = new Dexie('WorkTrackingDB');
 db.version(9).stores({
     data: '++id, employee, date',
     lmsData: '++id, employeeId, shift, date',
@@ -7,6 +7,16 @@ db.version(9).stores({
     workerOrder: 'employeeId, sortOrder',
     metadata: 'key, value'
 });
+
+// 기존 DB 삭제 (한 번만 실행)
+(async () => {
+    try {
+        await Dexie.delete('WorkTrackingDB');
+        console.log('기존 DB 삭제 완료');
+    } catch (err) {
+        console.log('기존 DB 삭제 시도:', err.message);
+    }
+})();
 
 // 전역 변수
 let currentData = [];
@@ -152,11 +162,16 @@ async function parseAndSaveData(jsonData) {
             }
         }
 
+        // 복합 키를 위해 htpStart 추가
+        task.htpStart = task['HTP Start'] || '';
+
         tasks.push(task);
     }
 
     currentData = tasks;
-    await db.data.bulkAdd(tasks);
+
+    // bulkPut 사용 (복합 키로 중복 방지 및 업데이트)
+    await db.data.bulkPut(tasks);
     await db.metadata.put({ key: 'lastUpdate', value: new Date().toLocaleString() });
 
     // UI 업데이트
@@ -923,11 +938,12 @@ function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, 
     // 모든 Location 수집
     const locations = Object.keys(locationData).sort();
 
-    // 헤더 생성 (이름, 작업자, Total Unit, Location들을 열로)
+    // 헤더 생성 (이름, 작업자, Total Unit, 해당시간 Unit, Location들을 열로)
     headerElement.innerHTML = `
         <th class="px-1 py-2 text-center font-semibold border border-gray-300 sticky left-0 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">이름</th>
         <th class="px-1 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">작업자</th>
         <th class="px-2 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">Total Unit</th>
+        <th class="px-2 py-2 text-center font-semibold border border-gray-300 ${type === 'day' ? 'bg-blue-50' : 'bg-indigo-50'}">${selectedHour}시 Unit</th>
     `;
 
     locations.forEach(location => {
@@ -1002,10 +1018,36 @@ function displayLocationTable(locationData, validWorkers, lmsMap, selectedHour, 
             }
         });
 
+        // 해당 시간대 Unit 계산 (선택한 시간의 모든 Location 합)
+        let selectedHourUnit = 0;
+        locations.forEach(location => {
+            const employeeData = locationData[location] && locationData[location][worker.name];
+            if (employeeData) {
+                let dateData = null;
+                let hourIndex = selectedHour;
+
+                if (type === 'day') {
+                    dateData = employeeData[latestDate];
+                } else {
+                    if (isHlLms) {
+                        dateData = employeeData[previousDate];
+                        hourIndex = 24 + selectedHour;
+                    } else {
+                        dateData = employeeData[latestDate];
+                    }
+                }
+
+                if (dateData && dateData[hourIndex]) {
+                    selectedHourUnit += dateData[hourIndex].qty;
+                }
+            }
+        });
+
         let rowHtml = `
             <td class="px-1 py-2 font-medium text-center border border-gray-300 sticky left-0 bg-white">${workerName}</td>
             <td class="px-1 py-2 text-center border border-gray-300 bg-white">${worker.name}</td>
             <td class="px-2 py-2 text-center border border-gray-300 bg-white font-semibold">${totalUnit.toFixed(0)}</td>
+            <td class="px-2 py-2 text-center border border-gray-300 bg-white font-semibold">${selectedHourUnit.toFixed(0)}</td>
         `;
 
         locations.forEach(location => {
