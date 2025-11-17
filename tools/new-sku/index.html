@@ -564,6 +564,12 @@
                         var textSkuid = convertToText(values[0]);
                         if (textSkuid === null) return false;
 
+                        // "19044114" 제외
+                        if (textSkuid === '19044114') {
+                            console.log('B 파일 SKUID:', textSkuid, '| 제외된 ID (19044114)');
+                            return false;
+                        }
+
                         var exists = skuSetA.has(textSkuid);
                         console.log('B 파일 SKUID:', textSkuid, '| 타입:', typeof textSkuid, '| A에 존재:', exists);
 
