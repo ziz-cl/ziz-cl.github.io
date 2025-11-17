@@ -634,8 +634,14 @@
             try {
                 var exportData = newSkuList.map(function(item) {
                     var values = Object.values(item);
+                    var skuValue = values[0] !== undefined ? values[0] : '';
+                    // 첫 번째 컬럼을 숫자로 변환
+                    var numericSku = Number(skuValue);
+                    if (isNaN(numericSku)) {
+                        numericSku = skuValue; // 변환 실패 시 원래 값 유지
+                    }
                     return {
-                        '외부 SKU': values[0] !== undefined ? values[0] : '',
+                        '외부 SKU': numericSku,
                         '유형': values[1] !== undefined ? values[1] : '',
                         'EDIT': 'ADD'
                     };
