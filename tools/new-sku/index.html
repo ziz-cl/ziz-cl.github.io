@@ -485,7 +485,8 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    // raw: false 옵션으로 모든 데이터를 TEXT 타입으로 읽기
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { raw: false });
 
                     if (type === 'A') {
                         fileAData = jsonData;
@@ -536,23 +537,37 @@
                     console.log('A 파일 데이터 수:', fileAData.length);
                     console.log('B 파일 데이터 수:', fileBData.length);
 
+                    // SKU ID를 TEXT 타입으로 변환하는 함수
+                    function convertToText(skuid) {
+                        if (skuid === undefined || skuid === null || skuid === '') {
+                            return null;
+                        }
+                        // 무조건 문자열로 변환하고 앞뒤 공백 제거
+                        return String(skuid).trim();
+                    }
+
                     const skuSetA = new Set();
                     fileAData.forEach(function(row) {
                         var values = Object.values(row);
-                        var skuid = values[0];
-                        if (skuid !== undefined && skuid !== null && skuid !== '') {
-                            skuSetA.add(String(skuid).trim());
+                        var textSkuid = convertToText(values[0]);
+                        if (textSkuid !== null) {
+                            skuSetA.add(textSkuid);
                         }
                     });
 
                     console.log('A 파일의 고유 SKUID 수:', skuSetA.size);
                     console.log('A 파일의 처음 10개 SKUID:', Array.from(skuSetA).slice(0, 10));
+                    console.log('타입 확인 (첫 번째 SKUID):', typeof Array.from(skuSetA)[0]);
 
                     newSkuList = fileBData.filter(function(row) {
                         var values = Object.values(row);
-                        var skuid = values[0];
-                        if (skuid === undefined || skuid === null || skuid === '') return false;
-                        return !skuSetA.has(String(skuid).trim());
+                        var textSkuid = convertToText(values[0]);
+                        if (textSkuid === null) return false;
+
+                        var exists = skuSetA.has(textSkuid);
+                        console.log('B 파일 SKUID:', textSkuid, '| 타입:', typeof textSkuid, '| A에 존재:', exists);
+
+                        return !exists;
                     });
 
                     console.log('\n=== 비교 결과 ===');
