@@ -390,7 +390,7 @@
                 <h3>&#128221; B 파일 (QUARY)</h3>
                 <p style="color: #666; margin-bottom: 15px; font-size: 0.9em;">새로운 SKU 목록</p>
                 <label for="file-b" class="upload-label">파일 선택</label>
-                <input type="file" id="file-b" accept=".xlsx, .xls">
+                <input type="file" id="file-b" accept=".xlsx, .xls, .csv">
                 <div class="file-name" id="file-b-name">선택된 파일 없음</div>
             </div>
         </div>
@@ -657,9 +657,9 @@
                     String(date.getDate()).padStart(2, '0') + '_' +
                     String(date.getHours()).padStart(2, '0') +
                     String(date.getMinutes()).padStart(2, '0');
-                const filename = 'NewSKU' + dateString + '.xlsx';
+                const filename = 'NewSKU' + dateString + '.csv';
 
-                XLSX.writeFile(wb, filename);
+                XLSX.writeFile(wb, filename, { bookType: 'csv' });
                 console.log('엑셀 다운로드 완료:', filename);
                 console.log('다운로드된 데이터:', exportData);
             } catch (error) {
