@@ -649,7 +649,7 @@
 
                 const wb = XLSX.utils.book_new();
                 const ws = XLSX.utils.json_to_sheet(exportData);
-                XLSX.utils.book_append_sheet(wb, ws, 'NewSKU');
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
                 const date = new Date();
                 const dateString = date.getFullYear() +
