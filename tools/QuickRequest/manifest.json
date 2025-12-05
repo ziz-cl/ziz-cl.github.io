@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "QuickRequest",
+  "version": "1.0.1",
+  "description": "HTTP 요청을 생성하고 관리하는 크롬 확장프로그램",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "cookies",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
