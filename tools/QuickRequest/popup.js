@@ -57,6 +57,11 @@ function setupEventListeners() {
     toggleBatchMode(e.target.checked);
   });
 
+  // 전체 Payload 모드 토글
+  document.getElementById('fullPayloadMode').addEventListener('change', (e) => {
+    toggleFullPayloadMode(e.target.checked);
+  });
+
   // 배치 모달 취소
   document.getElementById('cancelBatch').addEventListener('click', () => {
     closeBatchModal();
@@ -83,6 +88,17 @@ function toggleBatchMode(enabled) {
   } else {
     normalSection.classList.remove('hidden');
     batchSection.classList.add('hidden');
+  }
+}
+
+// 전체 Payload 모드 UI 토글
+function toggleFullPayloadMode(enabled) {
+  const singleParamBatch = document.getElementById('singleParamBatch');
+
+  if (enabled) {
+    singleParamBatch.classList.add('hidden');
+  } else {
+    singleParamBatch.classList.remove('hidden');
   }
 }
 
@@ -161,6 +177,7 @@ async function saveRequest() {
   const useCurrentCookies = document.getElementById('useCurrentCookies').checked;
   const applyToAllSites = document.getElementById('applyToAllSites').checked;
   const batchMode = document.getElementById('batchMode').checked;
+  const fullPayloadMode = batchMode ? document.getElementById('fullPayloadMode').checked : false;
 
   // JSON 파싱 검증
   let params = {};
@@ -170,22 +187,26 @@ async function saveRequest() {
 
   if (batchMode) {
     // 배치 모드인 경우
-    batchParamKey = document.getElementById('batchParamKey').value.trim();
-    const staticParamsText = document.getElementById('staticParams').value;
+    if (!fullPayloadMode) {
+      // 단일 파라미터 배치 모드
+      batchParamKey = document.getElementById('batchParamKey').value.trim();
+      const staticParamsText = document.getElementById('staticParams').value;
 
-    if (!batchParamKey) {
-      alert('배치 파라미터 키를 입력해주세요.');
-      return;
-    }
-
-    if (staticParamsText.trim()) {
-      try {
-        staticParams = JSON.parse(staticParamsText);
-      } catch (e) {
-        alert('고정 파라미터 JSON 형식이 올바르지 않습니다.');
+      if (!batchParamKey) {
+        alert('배치 파라미터 키를 입력해주세요.');
         return;
       }
+
+      if (staticParamsText.trim()) {
+        try {
+          staticParams = JSON.parse(staticParamsText);
+        } catch (e) {
+          alert('고정 파라미터 JSON 형식이 올바르지 않습니다.');
+          return;
+        }
+      }
     }
+    // 전체 Payload 모드인 경우 검증 생략 (실행 시 입력받음)
   } else {
     // 일반 모드인 경우
     const paramsText = document.getElementById('params').value;
@@ -220,6 +241,7 @@ async function saveRequest() {
     useCurrentCookies,
     applyToAllSites,
     batchMode,
+    fullPayloadMode,
     batchParamKey,
     staticParams,
     siteUrl: currentUrl,
@@ -237,6 +259,7 @@ async function saveRequest() {
   document.getElementById('useCurrentHeaders').checked = true;
   document.getElementById('useCurrentCookies').checked = true;
   toggleBatchMode(false);
+  toggleFullPayloadMode(false);
   switchTab('requests');
   await loadRequests();
 
@@ -315,10 +338,16 @@ async function editRequest(id) {
   toggleBatchMode(batchMode);
 
   if (batchMode) {
-    document.getElementById('batchParamKey').value = request.batchParamKey || '';
-    document.getElementById('staticParams').value = Object.keys(request.staticParams || {}).length > 0
-      ? JSON.stringify(request.staticParams, null, 2)
-      : '';
+    const fullPayloadMode = request.fullPayloadMode || false;
+    document.getElementById('fullPayloadMode').checked = fullPayloadMode;
+    toggleFullPayloadMode(fullPayloadMode);
+
+    if (!fullPayloadMode) {
+      document.getElementById('batchParamKey').value = request.batchParamKey || '';
+      document.getElementById('staticParams').value = Object.keys(request.staticParams || {}).length > 0
+        ? JSON.stringify(request.staticParams, null, 2)
+        : '';
+    }
   } else {
     document.getElementById('params').value = Object.keys(request.params || {}).length > 0
       ? JSON.stringify(request.params, null, 2)
@@ -377,8 +406,27 @@ let currentBatchRequest = null;
 
 function showBatchModal(request) {
   currentBatchRequest = request;
-  document.getElementById('batchParamKeyDisplay').textContent = request.batchParamKey;
-  document.getElementById('batchValues').value = '';
+
+  const modalDescription = document.getElementById('batchModalDescription');
+  const batchValuesLabel = document.getElementById('batchValuesLabel');
+  const batchValuesHelp = document.getElementById('batchValuesHelp');
+  const batchValues = document.getElementById('batchValues');
+
+  if (request.fullPayloadMode) {
+    // 전체 Payload 모드
+    modalDescription.innerHTML = '각 요청에 사용할 <strong>완전한 JSON Body</strong>를 입력하세요.';
+    batchValuesLabel.textContent = 'JSON Payload 목록 (줄바꿈으로 구분)';
+    batchValues.placeholder = '{"name": "John", "age": 25}\n{"name": "Jane", "age": 30}\n{"name": "Bob", "age": 35}';
+    batchValuesHelp.textContent = '각 줄마다 완전한 JSON 객체를 입력하세요';
+  } else {
+    // 단일 파라미터 배치 모드
+    modalDescription.innerHTML = `<strong>${request.batchParamKey}</strong> 파라미터에 적용할 값들을 입력하세요.`;
+    batchValuesLabel.textContent = '값 목록 (줄바꿈으로 구분)';
+    batchValues.placeholder = '123\n456\n789';
+    batchValuesHelp.textContent = '각 줄마다 하나의 요청이 생성됩니다';
+  }
+
+  batchValues.value = '';
   document.getElementById('batchModal').classList.remove('hidden');
 }
 
@@ -418,18 +466,42 @@ async function executeBatchRequests() {
     const value = values[i];
     console.log(`Processing value ${i + 1}/${values.length}:`, value); // 디버깅용
 
-    // 배치 파라미터 추가
-    const batchParams = {
-      ...currentBatchRequest.staticParams,
-      [currentBatchRequest.batchParamKey]: value
-    };
-    console.log('batchParams:', batchParams); // 디버깅용
+    let tempRequest;
 
-    // 임시 요청 객체 생성
-    const tempRequest = {
-      ...currentBatchRequest,
-      params: batchParams
-    };
+    if (currentBatchRequest.fullPayloadMode) {
+      // 전체 Payload 모드: 각 줄을 JSON으로 파싱하여 body로 사용
+      try {
+        const payloadBody = JSON.parse(value);
+        console.log('Parsed JSON payload:', payloadBody); // 디버깅용
+
+        tempRequest = {
+          ...currentBatchRequest,
+          body: payloadBody,
+          params: {} // params 비우기
+        };
+      } catch (e) {
+        console.error(`JSON 파싱 실패 (라인 ${i + 1}):`, e); // 디버깅용
+        results.push({
+          value: value,
+          success: false,
+          response: { error: `JSON 파싱 실패: ${e.message}` }
+        });
+        continue; // 다음 요청으로
+      }
+    } else {
+      // 단일 파라미터 배치 모드
+      const batchParams = {
+        ...currentBatchRequest.staticParams,
+        [currentBatchRequest.batchParamKey]: value
+      };
+      console.log('batchParams:', batchParams); // 디버깅용
+
+      tempRequest = {
+        ...currentBatchRequest,
+        params: batchParams
+      };
+    }
+
     console.log('tempRequest:', tempRequest); // 디버깅용
 
     try {

@@ -67,16 +67,26 @@
         </div>
 
         <div id="batchParamsSection" class="hidden">
-          <div class="form-group">
-            <label for="batchParamKey">배치 파라미터 키</label>
-            <input type="text" id="batchParamKey" placeholder="예: userId">
-            <small>이 파라미터에 여러 값을 적용하여 반복 실행합니다</small>
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="fullPayloadMode">
+              전체 Payload 배치 모드
+            </label>
+            <small>체크하면 각 요청마다 다른 전체 Body를 입력할 수 있습니다</small>
           </div>
 
-          <div class="form-group">
-            <label for="staticParams">고정 파라미터 (JSON 형식)</label>
-            <textarea id="staticParams" placeholder='{"type": "full", "format": "json"}' rows="2"></textarea>
-            <small>모든 요청에 공통으로 포함될 파라미터</small>
+          <div id="singleParamBatch">
+            <div class="form-group">
+              <label for="batchParamKey">배치 파라미터 키</label>
+              <input type="text" id="batchParamKey" placeholder="예: userId">
+              <small>이 파라미터에 여러 값을 적용하여 반복 실행합니다</small>
+            </div>
+
+            <div class="form-group">
+              <label for="staticParams">고정 파라미터 (JSON 형식)</label>
+              <textarea id="staticParams" placeholder='{"type": "full", "format": "json"}' rows="2"></textarea>
+              <small>모든 요청에 공통으로 포함될 파라미터</small>
+            </div>
           </div>
         </div>
 
@@ -130,13 +140,13 @@
     <div id="batchModal" class="modal hidden">
       <div class="modal-content">
         <h3>배치 실행</h3>
-        <p class="modal-description">
+        <p class="modal-description" id="batchModalDescription">
           <strong id="batchParamKeyDisplay"></strong> 파라미터에 적용할 값들을 입력하세요.
         </p>
         <div class="form-group">
-          <label for="batchValues">값 목록 (줄바꿈으로 구분)</label>
+          <label for="batchValues" id="batchValuesLabel">값 목록 (줄바꿈으로 구분)</label>
           <textarea id="batchValues" placeholder="123&#10;456&#10;789" rows="8"></textarea>
-          <small>각 줄마다 하나의 요청이 생성됩니다</small>
+          <small id="batchValuesHelp">각 줄마다 하나의 요청이 생성됩니다</small>
         </div>
         <div class="modal-actions">
           <button id="executeBatch" class="btn btn-primary">실행</button>
