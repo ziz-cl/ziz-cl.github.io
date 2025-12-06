@@ -1,161 +1,117 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuickRequest</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickRequest</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>QuickRequest</h1>
+    <div class="container">
+        <h1>QuickRequest</h1>
 
-    <div class="current-site">
-      <strong>현재 사이트:</strong>
-      <div id="currentUrl" class="url-display"></div>
-    </div>
-
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="requests">저장된 요청</button>
-      <button class="tab-btn" data-tab="new">새 요청</button>
-    </div>
-
-    <!-- 저장된 요청 목록 -->
-    <div id="requestsTab" class="tab-content active">
-      <div id="requestsList" class="requests-list">
-        <p class="empty-message">저장된 요청이 없습니다.</p>
-      </div>
-    </div>
-
-    <!-- 새 요청 생성 폼 -->
-    <div id="newTab" class="tab-content">
-      <form id="requestForm">
-        <div class="form-group">
-          <label for="requestName">요청 이름</label>
-          <input type="text" id="requestName" placeholder="예: 사용자 정보 조회" required>
+        <!-- 현재 사이트 정보 -->
+        <div class="section">
+            <div class="current-site">
+                <span id="currentSite">현재 사이트 로딩 중...</span>
+            </div>
         </div>
 
-        <div class="form-group">
-          <label for="method">HTTP 메서드</label>
-          <select id="method">
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-            <option value="DELETE">DELETE</option>
-            <option value="PATCH">PATCH</option>
-          </select>
+        <!-- 프리셋 선택 -->
+        <div class="section">
+            <label for="presetSelect">프리셋 선택:</label>
+            <select id="presetSelect">
+                <option value="">새 요청</option>
+            </select>
+            <button id="deletePresetBtn" class="btn-small btn-danger">삭제</button>
         </div>
 
-        <div class="form-group">
-          <label for="url">요청 URL</label>
-          <input type="text" id="url" placeholder="https://api.example.com/users" required>
+        <!-- 요청 URL -->
+        <div class="section">
+            <label for="requestUrl">요청 URL:</label>
+            <input type="text" id="requestUrl" placeholder="https://example.com/api/endpoint">
         </div>
 
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" id="batchMode">
-            배치 실행 모드 (여러 값으로 반복 실행)
-          </label>
-        </div>
-
-        <div id="normalParamsSection">
-          <div class="form-group">
-            <label for="params">파라미터 (JSON 형식)</label>
-            <textarea id="params" placeholder='{"userId": "123", "type": "full"}' rows="3"></textarea>
-            <small>GET 요청의 경우 쿼리 스트링으로 변환됩니다</small>
-          </div>
-        </div>
-
-        <div id="batchParamsSection" class="hidden">
-          <div class="form-group checkbox-group">
+        <!-- Headers -->
+        <div class="section">
             <label>
-              <input type="checkbox" id="fullPayloadMode">
-              전체 Payload 배치 모드
+                <input type="checkbox" id="useCurrentHeaders" checked>
+                현재 사이트의 Headers 사용
             </label>
-            <small>체크하면 각 요청마다 다른 전체 Body를 입력할 수 있습니다</small>
-          </div>
+            <div id="customHeadersSection" style="display: none;">
+                <label for="customHeaders">커스텀 Headers (JSON):</label>
+                <textarea id="customHeaders" rows="4" placeholder='{"Content-Type": "application/json"}'></textarea>
+            </div>
+        </div>
 
-          <div id="singleParamBatch">
-            <div class="form-group">
-              <label for="batchParamKey">배치 파라미터 키</label>
-              <input type="text" id="batchParamKey" placeholder="예: userId">
-              <small>이 파라미터에 여러 값을 적용하여 반복 실행합니다</small>
+        <!-- Cookies -->
+        <div class="section">
+            <label>
+                <input type="checkbox" id="useCurrentCookies" checked>
+                현재 사이트의 Cookies 사용
+            </label>
+        </div>
+
+        <!-- Request Body -->
+        <div class="section">
+            <label>요청 모드:</label>
+            <label>
+                <input type="radio" name="requestMode" value="single" checked>
+                단일 요청
+            </label>
+            <label>
+                <input type="radio" name="requestMode" value="bulk">
+                다중 요청
+            </label>
+
+            <!-- 단일 요청 모드 -->
+            <div id="singleRequestSection">
+                <label for="requestBody">Request Body (JSON):</label>
+                <textarea id="requestBody" rows="6" placeholder='{"key": "value"}'></textarea>
             </div>
 
-            <div class="form-group">
-              <label for="staticParams">고정 파라미터 (JSON 형식)</label>
-              <textarea id="staticParams" placeholder='{"type": "full", "format": "json"}' rows="2"></textarea>
-              <small>모든 요청에 공통으로 포함될 파라미터</small>
+            <!-- 다중 요청 모드 -->
+            <div id="bulkRequestSection" style="display: none;">
+                <label for="bulkTemplate">템플릿 (JSON):</label>
+                <textarea id="bulkTemplate" rows="4" placeholder='{"name": "{{VALUE}}", "age": 25}'></textarea>
+
+                <label for="bulkPlaceholder">대체할 키워드 (기본값: {{VALUE}}):</label>
+                <input type="text" id="bulkPlaceholder" value="{{VALUE}}" placeholder="{{VALUE}}">
+
+                <label for="bulkValues">값 목록 (줄바꿈으로 구분):</label>
+                <textarea id="bulkValues" rows="6" placeholder='John&#10;Jane&#10;Bob'></textarea>
             </div>
-          </div>
         </div>
 
-        <div class="form-group">
-          <label for="body">Body 데이터 (JSON 형식)</label>
-          <textarea id="body" placeholder='{"name": "홍길동", "email": "test@example.com"}' rows="4"></textarea>
-          <small>POST, PUT, PATCH 요청에서 사용됩니다</small>
+        <!-- 프리셋 저장 옵션 -->
+        <div class="section">
+            <label for="presetName">프리셋 이름:</label>
+            <input type="text" id="presetName" placeholder="프리셋 이름을 입력하세요">
+
+            <label>
+                <input type="radio" name="presetScope" value="site" checked>
+                현재 사이트에서만 사용
+            </label>
+            <label>
+                <input type="radio" name="presetScope" value="global">
+                모든 사이트에서 사용
+            </label>
         </div>
 
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" id="useCurrentHeaders">
-            현재 사이트의 헤더 사용
-          </label>
+        <!-- 버튼 -->
+        <div class="section button-group">
+            <button id="sendRequestBtn" class="btn btn-primary">요청 보내기</button>
+            <button id="savePresetBtn" class="btn btn-secondary">프리셋 저장</button>
         </div>
 
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" id="useCurrentCookies">
-            현재 사이트의 쿠키 사용
-          </label>
+        <!-- 응답 영역 -->
+        <div class="section">
+            <label>응답:</label>
+            <div id="responseStatus" class="response-status"></div>
+            <pre id="responseBody" class="response-body"></pre>
         </div>
-
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" id="applyToAllSites">
-            모든 사이트에 적용
-          </label>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">저장</button>
-          <button type="button" id="cancelBtn" class="btn btn-secondary">취소</button>
-        </div>
-      </form>
     </div>
 
-    <!-- 요청 실행 결과 -->
-    <div id="responseSection" class="response-section hidden">
-      <h3>응답 결과</h3>
-      <div class="response-status">
-        <span id="responseStatus"></span>
-      </div>
-      <div class="response-body">
-        <div id="responseBody"></div>
-      </div>
-      <button id="closeResponse" class="btn btn-secondary">닫기</button>
-    </div>
-
-    <!-- 배치 실행 모달 -->
-    <div id="batchModal" class="modal hidden">
-      <div class="modal-content">
-        <h3>배치 실행</h3>
-        <p class="modal-description" id="batchModalDescription">
-          <strong id="batchParamKeyDisplay"></strong> 파라미터에 적용할 값들을 입력하세요.
-        </p>
-        <div class="form-group">
-          <label for="batchValues" id="batchValuesLabel">값 목록 (줄바꿈으로 구분)</label>
-          <textarea id="batchValues" placeholder="123&#10;456&#10;789" rows="8"></textarea>
-          <small id="batchValuesHelp">각 줄마다 하나의 요청이 생성됩니다</small>
-        </div>
-        <div class="modal-actions">
-          <button id="executeBatch" class="btn btn-primary">실행</button>
-          <button id="cancelBatch" class="btn btn-secondary">취소</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="popup.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>
