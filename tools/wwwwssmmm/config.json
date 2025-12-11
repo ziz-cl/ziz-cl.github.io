@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "minVersion": "1.0.0",
+  "updateUrl": "https://github.com/username/repo/raw/main/drop.js",
+  "message": "새로운 기능이 추가되었습니다!",
+  "changelog": "- 설정 공유 기능 추가\n- 바운싱 애니메이션 추가"
+}
