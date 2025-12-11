@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "enabled": false,
+  "enabled": true,
   "minVersion": "1.0.0",
   "updateUrl": "https://github.com/username/repo/raw/main/drop.js",
   "message": "새로운 기능이 추가되었습니다!",
