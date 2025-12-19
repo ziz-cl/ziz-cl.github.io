@@ -1,6 +1,6 @@
 {
   "_comment": "WMS 커스텀 확장 원격설정. enabled=false 또는 killSwitch=true면 비활성화",
-  "enabled": true,
+  "enabled": false,
   "killSwitch": false,
   "killKey": "ks_zizizi_34324",
   "killSalt": "wms_custom_2025",
