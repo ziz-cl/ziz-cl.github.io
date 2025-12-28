@@ -1,7 +1,7 @@
 {
   "_comment": "enabled=false 또는 killSwitch=true면 비활성화",
-  "enabled": true,
-  "killSwitch": false,
+  "enabled": false,
+  "killSwitch": true,
   "killKey": "Xp7mR2vK9nL4qT8wB3jF6",
   "killSalt": "Yw5cH0dN8sG1fA4iO6uE9",
   "version": "1.0.0"
